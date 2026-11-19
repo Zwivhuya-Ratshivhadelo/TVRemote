@@ -106,6 +106,9 @@ class HomeKeyService : AccessibilityService() {
         val pk = event.packageName?.toString() ?: ""
         if (pk == PlayStore.VENDING) link?.onStoreScreen()
         if (pk in INSTALLERS && Updater.pending && System.currentTimeMillis() - Updater.pendingAt < 3 * 60_000) pressInstall()
+        if (pk != packageName && System.currentTimeMillis() - TvSettings.pairingAt < 30_000) {
+            rootInActiveWindow?.let { r -> MenuDriver.press(MenuDriver.find(r, "Pair") ?: MenuDriver.find(r, "OK")) }
+        }
         if (pk != packageName && TvSettings.askingBt && System.currentTimeMillis() - TvSettings.askedAt < 20_000) {
             rootInActiveWindow?.let { r -> if (MenuDriver.press(MenuDriver.find(r, "Allow"))) TvSettings.askingBt = false }
         }

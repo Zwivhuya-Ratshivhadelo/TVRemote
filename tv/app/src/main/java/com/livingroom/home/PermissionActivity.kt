@@ -8,7 +8,7 @@ import android.os.Bundle
 class PermissionActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        if (android.os.Build.VERSION.SDK_INT >= 31) requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1) else finish()
+        if (android.os.Build.VERSION.SDK_INT >= 31) requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN), 1) else finish()
     }
     override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) { finish() }
 }

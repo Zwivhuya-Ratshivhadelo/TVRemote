@@ -164,7 +164,7 @@ class SettingsActivity : Activity() {
             Hub.send("bt_power", "on" to !on); setLocal("bt", "on", !on)
         }
         if (!on) return
-        val devs = b.optJSONArray("devices") ?: return
+        val devs = b.optJSONArray("devices") ?: org.json.JSONArray()
         val connected = (0 until devs.length()).mapNotNull { devs.optJSONObject(it) }.filter { it.optBoolean("conn") }
         val paired = (0 until devs.length()).mapNotNull { devs.optJSONObject(it) }.filter { !it.optBoolean("conn") }
         if (connected.isNotEmpty()) { label("CONNECTED"); for (d in connected) row(d.optString("name"), sub = d.optString("kind").takeIf { it.isNotEmpty() }, right = tick()) }
@@ -172,6 +172,14 @@ class SettingsActivity : Activity() {
             label("PAIRED")
             for (d in paired) row(d.optString("name"), right = text(s, 14f, alpha = 0.6f).apply { text = "Connect" }) {
                 Hub.send("bt_connect", "addr" to d.optString("addr"))
+            }
+        }
+        val near = b.optJSONArray("nearby")
+        if (near != null && near.length() > 0) {
+            label("NEARBY")
+            for (k in 0 until near.length()) {
+                val d = near.optJSONObject(k) ?: continue
+                row(d.optString("name"), right = text(s, 14f, alpha = 0.6f).apply { text = "Pair" }) { Hub.send("bt_pair", "addr" to d.optString("addr")) }
             }
         }
     }

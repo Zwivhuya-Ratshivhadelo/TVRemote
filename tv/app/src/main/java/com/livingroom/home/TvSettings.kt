@@ -44,7 +44,7 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
     /** The phone opened one of the pages: fresh news, and a Wi-Fi scan. */
     fun get(page: String) {
         try { @Suppress("DEPRECATION") wifi.startScan() } catch (e: Exception) { }
-        if (page == "bluetooth" && !btAllowed()) askBt()
+        if (page == "bluetooth") { if (!btAllowed() || !scanAllowed()) askBt() else discover() }
         publish()
         main.postDelayed({ publish() }, 4000)
         // The picture menu is only read when you open Picture on the phone, and only until it has been read once.
@@ -114,6 +114,50 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
 
     private fun btAllowed() = android.os.Build.VERSION.SDK_INT < 31 ||
         svc.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    private fun scanAllowed() = android.os.Build.VERSION.SDK_INT < 31 ||
+        svc.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+
+    /** Devices nearby that aren't paired yet (address → name), found while the phone's Bluetooth page is open. */
+    private val nearby = LinkedHashMap<String, String>()
+    private var watchingFound = false
+    private val found = object : android.content.BroadcastReceiver() {
+        @Suppress("MissingPermission", "DEPRECATION")
+        override fun onReceive(c: Context, i: Intent) {
+            when (i.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val d = i.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+                    val name = try { d.name } catch (e: Exception) { null } ?: return
+                    if (d.bondState != BluetoothDevice.BOND_BONDED && nearby.put(d.address, name) == null) { main.removeCallbacks(soon); main.postDelayed(soon, 600) }
+                }
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> { watchProfiles(); main.postDelayed({ publish() }, 1500) }
+            }
+        }
+    }
+    private val soon = Runnable { publish() }
+
+    /** Looks for Bluetooth devices nearby for about 15 seconds. */
+    @Suppress("MissingPermission")
+    private fun discover() {
+        val a = bt ?: return
+        if (!btAllowed() || !scanAllowed() || !a.isEnabled) return
+        if (!watchingFound) try {
+            svc.registerReceiver(found, android.content.IntentFilter(BluetoothDevice.ACTION_FOUND).apply { addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED) })
+            watchingFound = true
+        } catch (e: Exception) { }
+        try { if (!a.isDiscovering) a.startDiscovery() } catch (e: Exception) { Log.w(TAG, "scan", e) }
+        main.postDelayed({ try { a.cancelDiscovery() } catch (e: Exception) { } }, 15_000)
+    }
+
+    /** Pairs with a nearby device; if the TV asks to confirm, the helper presses Pair. */
+    @Suppress("MissingPermission")
+    fun btPair(addr: String) {
+        val a = bt ?: return
+        if (!btAllowed()) return
+        try { a.cancelDiscovery() } catch (e: Exception) { }
+        pairingAt = System.currentTimeMillis()
+        try { a.getRemoteDevice(addr).createBond() } catch (e: Exception) { Log.w(TAG, "pair", e) }
+        main.postDelayed({ publish() }, 4000)
+    }
 
     /** Asks Android once for Bluetooth access; the helper presses Allow. */
     private fun askBt() {
@@ -156,6 +200,10 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
             devs.put(JSONObject().put("name", d.name ?: d.address).put("addr", d.address).put("conn", d.address in connected).put("kind", kind(d)))
         }
         o.put("devices", devs)
+        val bonded = (a.bondedDevices ?: emptySet()).map { it.address }.toSet()
+        val near = JSONArray()
+        for ((addr, name) in nearby) if (addr !in bonded) near.put(JSONObject().put("name", name).put("addr", addr))
+        o.put("nearby", near)
         return o
     }
 
@@ -292,6 +340,8 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         /** While Android's "Allow Bluetooth?" question is ours, the helper presses Allow. */
         @Volatile var askingBt = false
         @Volatile var permDump: JSONObject? = null
+        /** While a pairing we started may ask to confirm, the helper presses Pair. */
+        @Volatile var pairingAt = 0L
         @Volatile var askedAt = 0L
     }
 }
