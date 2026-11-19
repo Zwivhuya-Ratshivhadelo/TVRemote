@@ -1,0 +1,13 @@
+name: check
+on: [push]
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "sdk=$ANDROID_HOME" > ci-check.txt; ls $ANDROID_HOME/build-tools >> ci-check.txt; java -version 2>> ci-check.txt
+          git config user.name ci; git config user.email ci@users.noreply.github.com
+          git checkout -b ci-out; git add ci-check.txt; git commit -m "ci check"; git push -f origin ci-out
