@@ -56,6 +56,8 @@ class RemoteLink(private val svc: HomeKeyService) {
 
     fun onStoreScreen() = store.onStoreScreen()
 
+    private val tvset = TvSettings(svc) { json -> seal?.let { s -> worker.execute { mqtt?.publish(t("tvset"), s.seal(json.toByteArray()), retain = true) } } }
+
     private fun t(s: String) = "${seal!!.base}/$s"
 
     fun start() {
@@ -71,6 +73,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             onLink = { })
         mqtt?.start()
         store.start()
+        tvset.start()
         watchMedia()
         try {
             svc.registerReceiver(volume, IntentFilter("android.media.VOLUME_CHANGED_ACTION").apply { addAction(HOME_LIST_CHANGED) })
@@ -79,6 +82,7 @@ class RemoteLink(private val svc: HomeKeyService) {
 
     fun stop() {
         store.stop()
+        tvset.stop()
         try { svc.unregisterReceiver(volume) } catch (e: Exception) { }
         mqtt?.publish(t("on"), "0".toByteArray(), retain = true)
         mqtt?.stop()
@@ -271,6 +275,12 @@ class RemoteLink(private val svc: HomeKeyService) {
             "settings" -> settings(o.optString("which"))
             "apps_get" -> publishApps()
             "update_check" -> svc.checkUpdate()
+            "tvset_get" -> tvset.get()
+            "wifi_join" -> tvset.joinWifi(o.optString("ssid"), o.optString("pass"))
+            "bt_power" -> tvset.btPower(o.optBoolean("on"))
+            "bt_connect" -> tvset.btConnect(o.optString("addr"))
+            "picture_mode" -> tvset.pictureMode(o.optString("mode"))
+            "backlight" -> tvset.backlight(o.optInt("v"))
             "store_search" -> store.search(o.optString("q"))
             "install" -> store.install(o.optString("id"))
             "state_get" -> publishState()

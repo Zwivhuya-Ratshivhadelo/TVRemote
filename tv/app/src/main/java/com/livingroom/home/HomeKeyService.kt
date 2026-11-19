@@ -29,9 +29,9 @@ class HomeKeyService : AccessibilityService() {
     @Volatile private var waitingUpdate: java.io.File? = null
     private var front = ""
 
-    /** Checks GitHub for a newer build: 1 minute after starting, then every 3 hours (and whenever the phone asks). */
+    /** Checks GitHub for a newer build: 1 minute after starting, every 30 minutes, when the TV wakes, and whenever the phone asks. */
     private val updateTick = object : Runnable {
-        override fun run() { checkUpdate(); main.postDelayed(this, 3 * 60 * 60_000L) }
+        override fun run() { checkUpdate(); main.postDelayed(this, 30 * 60_000L) }
     }
 
     fun checkUpdate() {
@@ -41,7 +41,7 @@ class HomeKeyService : AccessibilityService() {
     /** Updates only while our home screen is showing, so nothing you're watching gets interrupted. */
     private fun installWhenIdle() {
         val f = waitingUpdate ?: return
-        if (front != packageName) return
+        if (!HomeActivity.showing) return
         waitingUpdate = null
         updater?.install(f)
     }
@@ -51,6 +51,8 @@ class HomeKeyService : AccessibilityService() {
             // Google's home comes up as the TV wakes; open ours just after it.
             main.postDelayed({ openHome() }, 900)
             main.postDelayed({ openHome() }, 2500)
+            // A good moment to look for a new build.
+            if (intent.action == Intent.ACTION_SCREEN_ON) main.postDelayed({ checkUpdate() }, 20_000)
         }
     }
 
@@ -99,6 +101,9 @@ class HomeKeyService : AccessibilityService() {
         val pk = event.packageName?.toString() ?: ""
         if (pk == PlayStore.VENDING) link?.onStoreScreen()
         if (pk in INSTALLERS && Updater.pending && System.currentTimeMillis() - Updater.pendingAt < 3 * 60_000) pressInstall()
+        if (pk in PERMISSION_UI && TvSettings.askingBt && System.currentTimeMillis() - TvSettings.askedAt < 20_000) {
+            rootInActiveWindow?.let { r -> if (MenuDriver.press(MenuDriver.find(r, "Allow"))) TvSettings.askingBt = false }
+        }
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && pk.isNotEmpty()) {
             front = pk
             if (pk == packageName && waitingUpdate != null) main.postDelayed({ installWhenIdle() }, 3000)
@@ -118,7 +123,7 @@ class HomeKeyService : AccessibilityService() {
     fun dpad(k: String) {
         val code = when (k) { "up" -> KeyEvent.KEYCODE_DPAD_UP; "down" -> KeyEvent.KEYCODE_DPAD_DOWN; "left" -> KeyEvent.KEYCODE_DPAD_LEFT
             "right" -> KeyEvent.KEYCODE_DPAD_RIGHT; else -> KeyEvent.KEYCODE_DPAD_CENTER }
-        if (front == packageName) { sendBroadcast(Intent(RemoteLink.DPAD).setPackage(packageName).putExtra("code", code)); return }
+        if (HomeActivity.showing) { sendBroadcast(Intent(RemoteLink.DPAD).setPackage(packageName).putExtra("code", code)); return }
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             val a = when (k) { "up" -> 16; "down" -> 17; "left" -> 18; "right" -> 19; else -> 20 }   // GLOBAL_ACTION_DPAD_*
             if (performGlobalAction(a)) return
@@ -162,5 +167,6 @@ class HomeKeyService : AccessibilityService() {
         private const val TAG = "LivingRoomHome"
         private const val GOOGLE_HOME = "com.google.android.apps.tv.launcherx"
         private val INSTALLERS = setOf("com.google.android.packageinstaller", "com.android.packageinstaller")
+        private val PERMISSION_UI = setOf("com.google.android.permissioncontroller", "com.android.permissioncontroller", "com.android.packageinstaller", "com.google.android.packageinstaller")
     }
 }

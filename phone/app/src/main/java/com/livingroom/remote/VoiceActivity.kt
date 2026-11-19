@@ -59,16 +59,16 @@ class VoiceActivity : Activity() {
     }
 
     private fun listen() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) { said.text = "Google voice is not available on this phone"; return }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
         rec?.destroy()
         rec = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(p: Bundle?) { said.alpha = 0.6f; said.text = "…" }
+                override fun onReadyForSpeech(p: Bundle?) { said.text = "" }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rms: Float) { pulse(rms) }
                 override fun onBufferReceived(b: ByteArray?) {}
                 override fun onEndOfSpeech() { pulse(0f) }
-                override fun onError(e: Int) { pulse(0f); if (!sent) { said.alpha = 0.6f; said.text = "Tap the mic and try again" } }
+                override fun onError(e: Int) { pulse(0f); if (!sent) said.text = "" }
                 override fun onPartialResults(b: Bundle?) { b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { said.alpha = 1f; said.text = it } }
                 override fun onEvent(t: Int, b: Bundle?) {}
                 override fun onResults(b: Bundle?) {

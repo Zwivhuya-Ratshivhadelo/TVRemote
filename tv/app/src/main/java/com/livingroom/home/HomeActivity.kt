@@ -47,7 +47,7 @@ import java.util.concurrent.Executors
 
 class HomeActivity : Activity() {
 
-    private companion object {
+    companion object {
         const val BUB = 340
         const val HALO = 1100
         const val MOVE_SECONDS = 0.75f
@@ -60,6 +60,8 @@ class HomeActivity : Activity() {
             floatArrayOf(1850f, 900f, 0.10f), floatArrayOf(1270f, 955f, 0.40f), floatArrayOf(900f, 610f, 0.25f),
             floatArrayOf(1600f, 250f, 0.70f)
         )
+        /** True while our home screen is the one on the TV. */
+        @Volatile @JvmStatic var showing = false
         const val TILE_GAP = 24; const val PICK_W = 384; const val PICK_H = 216; const val PICK_GAP = 24 }
 
     private enum class Zone { DOCK, PICKS, PANEL, INPUTS }
@@ -138,6 +140,7 @@ class HomeActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        showing = true
         main.removeCallbacks(ticker)
         ticker.run()
         refreshApps()
@@ -154,6 +157,7 @@ class HomeActivity : Activity() {
     }
 
     override fun onPause() {
+        showing = false
         android.view.Choreographer.getInstance().removeFrameCallback(bubbleFrame)
         main.removeCallbacks(ticker)
         main.removeCallbacks(periodic)

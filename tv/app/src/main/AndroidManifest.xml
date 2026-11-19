@@ -26,6 +26,11 @@
     <!-- Updates itself from the builds GitHub makes. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- The phone's Bluetooth page: on/off and the TV's devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- The fixed apps in the carousel, so the home screen can find them and their icons. -->
     <queries>
         <package android:name="com.netflix.ninja" />
@@ -149,6 +154,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+        <activity
+            android:name=".PermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- After an update, straight back to the home screen. -->
         <receiver android:name=".UpdatedReceiver" android:exported="false">
             <intent-filter>

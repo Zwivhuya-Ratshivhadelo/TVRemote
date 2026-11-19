@@ -78,7 +78,7 @@ class AppsActivity : Activity() {
         // Only your home screen apps; everything else is found by searching.
         if (q.isEmpty()) {
             val home = apps.filter { it.on }
-            if (home.isEmpty()) note("Waiting for the TV…") else section(null, home)
+            section(null, home)
             return
         }
         val local = apps.filter { it.label.lowercase().contains(q) }
@@ -89,10 +89,10 @@ class AppsActivity : Activity() {
         val have = Hub.apps.map { it.id }.toSet()
         if (f == null || f.first != query) {
             if (System.currentTimeMillis() - askedAt > 8500) return   // the TV didn't answer: show only what it has
-            if (local.isEmpty()) note(if (Hub.tvOnline) "Searching…" else "The TV is off"); return
+            return
         }
         val play = f.second.filter { it.id !in have }
-        if (play.isEmpty() && local.isEmpty()) { note("Nothing called \"$query\""); return }
+        
         section(null, play, store = true)
     }
 

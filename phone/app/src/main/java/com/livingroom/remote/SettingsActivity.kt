@@ -92,7 +92,7 @@ class SettingsActivity : Activity() {
         list.removeAllViews()
         val t = Hub.tvSet
         val part = when (page) { "picture" -> t?.optJSONObject("picture"); "wifi" -> t?.optJSONObject("wifi"); else -> t?.optJSONObject("bt") }
-        if (part == null) { note(if (Hub.tvOnline || !Hub.linked) "Waiting for the TV" else "The TV is off"); return }
+        if (part == null) return
         when (page) { "picture" -> picture(part); "wifi" -> wifi(part); else -> bluetooth(part) }
     }
 

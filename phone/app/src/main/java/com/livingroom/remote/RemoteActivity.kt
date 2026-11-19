@@ -444,7 +444,7 @@ class RemoteActivity : Activity(), SensorEventListener {
     private fun checkUpdates() {
         val prefs = getPreferences(Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (now - prefs.getLong("update_at", 0L) < 6 * 60 * 60_000L) return
+        if (now - prefs.getLong("update_at", 0L) < 10 * 60_000L) return
         prefs.edit().putLong("update_at", now).apply()
         Hub.send("update_check")
         updater.check { f -> runOnUiThread { updater.install(f) } }
