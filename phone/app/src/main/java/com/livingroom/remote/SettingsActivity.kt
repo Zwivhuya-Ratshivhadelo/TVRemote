@@ -92,7 +92,7 @@ class SettingsActivity : Activity() {
         list.removeAllViews()
         val t = Hub.tvSet
         val part = when (page) { "picture" -> t?.optJSONObject("picture"); "wifi" -> t?.optJSONObject("wifi"); else -> t?.optJSONObject("bt") }
-        if (part == null) return
+        if (part == null) { list.addView(Loader(this), LinearLayout.LayoutParams(-1, s.px(28)).apply { topMargin = s.px(40) }); return }
         when (page) { "picture" -> picture(part); "wifi" -> wifi(part); else -> bluetooth(part) }
     }
 

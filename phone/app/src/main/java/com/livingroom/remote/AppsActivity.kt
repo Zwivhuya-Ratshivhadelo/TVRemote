@@ -65,7 +65,7 @@ class AppsActivity : Activity() {
 
     private val onHub = { fill() }
     private var askedAt = 0L
-    private val askPlay = Runnable { askedAt = System.currentTimeMillis(); Hub.send("store_search", "q" to query); grid.postDelayed({ fill() }, 9000) }
+    private val askPlay = Runnable { askedAt = System.currentTimeMillis(); Hub.send("store_search", "q" to query); grid.postDelayed({ fill() }, 30_000) }
 
     private fun fill() {
         grid.removeAllViews()
@@ -88,12 +88,17 @@ class AppsActivity : Activity() {
         val f = Hub.found
         val have = Hub.apps.map { it.id }.toSet()
         if (f == null || f.first != query) {
-            if (System.currentTimeMillis() - askedAt > 8500) return   // the TV didn't answer: show only what it has
+            // Still looking on Google Play: dots, until it answers (or 30 seconds go by).
+            if (System.currentTimeMillis() - askedAt < 30_000 || askedAt == 0L) loader()
             return
         }
-        val play = f.second.filter { it.id !in have }
+        val play = f.second.filter { it.id !in have }.distinctBy { it.label.trim().lowercase() }
         
         section(null, play, store = true)
+    }
+
+    private fun loader() {
+        grid.addView(Loader(this), LinearLayout.LayoutParams(-1, s.px(28)).apply { topMargin = s.px(24) })
     }
 
     /** The TV maker's built-in extras: only shown when you search for them. */

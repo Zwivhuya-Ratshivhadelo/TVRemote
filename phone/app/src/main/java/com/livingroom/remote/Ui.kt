@@ -215,3 +215,18 @@ fun averageColor(b: Bitmap): Int {
     }
     return if (n == 0L) Color.rgb(200, 210, 255) else Color.rgb((r / n).toInt(), (g / n).toInt(), (bl / n).toInt())
 }
+
+/** Three dots that pulse one after another, while waiting for the TV. */
+class Loader(ctx: Context) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    override fun onDraw(c: Canvas) {
+        val t = SystemClock.uptimeMillis() / 1000f
+        val r = height * 0.22f; val gap = r * 3.2f; val cx = width / 2f; val cy = height / 2f
+        for (i in 0 until 3) {
+            val k = ((kotlin.math.sin((t * 5f - i * 0.9f).toDouble()) + 1) / 2).toFloat()
+            p.alpha = (70 + 185 * k).toInt()
+            c.drawCircle(cx + (i - 1) * gap, cy - k * r * 0.6f, r * (0.8f + 0.2f * k), p)
+        }
+        postInvalidateOnAnimation()
+    }
+}
