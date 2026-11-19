@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixed 1920 x 1080 stage (same as the design), scaled to the TV's real screen in HomeActivity. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000"
+    android:clipChildren="false">
+
+    <FrameLayout
+        android:id="@+id/stage"
+        android:layout_width="1920px"
+        android:layout_height="1080px"
+        android:clipChildren="false"
+        android:descendantFocusability="blocksDescendants"
+        android:focusable="true"
+        android:focusableInTouchMode="true">
+
+        <com.livingroom.home.SkyView
+            android:id="@+id/sky"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Greeting, pixel clock, date + analog clock -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="90px"
+            android:layout_marginTop="64px"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/greeting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.02"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="26px" />
+
+                <com.livingroom.home.PixelClockView
+                    android:id="@+id/pixelClock"
+                    android:layout_width="325px"
+                    android:layout_height="89px"
+                    android:layout_marginTop="12px"
+                    android:layout_marginBottom="14px" />
+
+                <TextView
+                    android:id="@+id/date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="26px" />
+            </LinearLayout>
+
+            <com.livingroom.home.AnalogClockView
+                android:id="@+id/analogClock"
+                android:layout_width="210px"
+                android:layout_height="210px"
+                android:layout_marginLeft="56px" />
+        </LinearLayout>
+
+        <!-- Weather -->
+        <LinearLayout
+            android:layout_width="540px"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="90px"
+            android:layout_marginTop="318px"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.livingroom.home.WeatherIconView
+                    android:id="@+id/wxIcon"
+                    android:layout_width="88px"
+                    android:layout_height="88px"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/wxTemp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="14px"
+                    android:fontFamily="sans-serif-light"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="-0.04"
+                    android:text="--°"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="96px" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="22px"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/wxLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="28px" />
+
+                    <TextView
+                        android:id="@+id/wxLine1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4px"
+                        android:fontFamily="sans-serif"
+                        android:maxLines="1"
+                        android:textColor="#E0FFFFFF"
+                        android:textSize="19px" />
+
+                    <TextView
+                        android:id="@+id/wxHighLow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2px"
+                        android:fontFamily="sans-serif"
+                        android:maxLines="1"
+                        android:textColor="#E0FFFFFF"
+                        android:textSize="19px" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Heads-up: "Thunderstorms likely from 21:00 · Low 17°" (hidden when nothing is coming) -->
+            <LinearLayout
+                android:id="@+id/wxWarnRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14px"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <com.livingroom.home.WeatherIconView
+                    android:id="@+id/wxWarnIcon"
+                    android:layout_width="34px"
+                    android:layout_height="34px"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:id="@+id/wxWarn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="10px"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="21px" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/wxLine2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1px"
+                android:layout_marginTop="14px"
+                android:background="#40FFFFFF" />
+
+            <!-- Next 6 hours -->
+            <LinearLayout
+                android:id="@+id/forecast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14px"
+                android:orientation="horizontal" />
+        </LinearLayout>
+
+        <!-- Control panel (top right) -->
+        <LinearLayout
+            android:id="@+id/pills"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="70px"
+            android:layout_marginRight="80px"
+            android:background="@drawable/glass"
+            android:orientation="horizontal"
+            android:padding="12px" />
+
+        <!-- Netflix / YouTube picks -->
+        <LinearLayout
+            android:id="@+id/picks"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|left"
+            android:layout_marginTop="576px"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/picksTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14px"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:textColor="#D9FFFFFF"
+                android:textSize="20px" />
+
+            <LinearLayout
+                android:id="@+id/picksRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </LinearLayout>
+
+        <!-- Apps: floating bubbles at different depths; the selected one comes forward -->
+        <FrameLayout
+            android:id="@+id/dock"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false" />
+
+        <!-- Inputs list -->
+        <FrameLayout
+            android:id="@+id/inputsPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#B3000000"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="760px"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:background="@drawable/panel_bg"
+                android:orientation="vertical"
+                android:padding="40px">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="24px"
+                    android:layout_marginBottom="20px"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/inputs_title"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="44px" />
+
+                <LinearLayout
+                    android:id="@+id/inputsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/toast"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/glass_card"
+            android:fontFamily="sans-serif-medium"
+            android:paddingLeft="38px"
+            android:paddingTop="22px"
+            android:paddingRight="38px"
+            android:paddingBottom="22px"
+            android:textColor="#FFFFFFFF"
+            android:textSize="28px"
+            android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>

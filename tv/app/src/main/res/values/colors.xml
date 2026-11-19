@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF070814</color>
+    <color name="fg">#FFF4F4F5</color>
+    <color name="muted">#FFB4B4BC</color>
+    <color name="hint">#FF8A8A93</color>
+    <color name="line">#FF2A2A30</color>
+    <color name="pill">#D91C1C21</color>
+    <color name="card">#FF17171B</color>
+</resources>

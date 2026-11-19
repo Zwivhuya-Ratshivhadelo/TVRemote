@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Living Room Home</string>
+    <string name="dream_name">Living Room clock</string>
+    <string name="search_hint">Search Google</string>
+    <string name="city">Sasolburg</string>
+    <string name="inputs_title">Inputs</string>
+    <string name="inputs_none">No inputs found. Opening Settings instead.</string>
+    <string name="home_key_name">Living Room Home button</string>
+    <string name="home_key_description">Makes the remote\'s HOME button open the Living Room home screen.</string>
+</resources>

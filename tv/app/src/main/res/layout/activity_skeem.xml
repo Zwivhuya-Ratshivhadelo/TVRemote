@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#8C04050C">
+
+    <LinearLayout
+        android:layout_width="380dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/skeem_card"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.12"
+            android:text="19:30 · SABC 1"
+            android:textAllCaps="true"
+            android:textColor="#BFFFFFFF"
+            android:textSize="11sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="Skeem Saam is starting"
+            android:textColor="#FFFFFFFF"
+            android:textSize="30sp" />
+
+        <TextView
+            android:id="@+id/skeemCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#CCFFFFFF"
+            android:textSize="14sp" />
+
+        <ProgressBar
+            android:id="@+id/skeemBar"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="10dp"
+            android:max="100"
+            android:progressDrawable="@drawable/skeem_bar" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/skeemWatch"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/skeem_button"
+                android:paddingLeft="20dp"
+                android:paddingRight="20dp"
+                android:text="Watch now"
+                android:textAllCaps="false"
+                android:textColor="@color/skeem_button_text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/skeemSkip"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginLeft="10dp"
+                android:background="@drawable/skeem_button"
+                android:paddingLeft="20dp"
+                android:paddingRight="20dp"
+                android:text="Not tonight"
+                android:textAllCaps="false"
+                android:textColor="@color/skeem_button_text"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

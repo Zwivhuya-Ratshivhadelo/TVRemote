@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared secret between this TV and your phone remote. Filled in by update.cmd on the laptop. -->
+<resources>
+    <string name="link_key" translatable="false"></string>
+</resources>

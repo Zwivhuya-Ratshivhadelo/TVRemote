@@ -1,0 +1,68 @@
+TONIGHT'S TV SETUP - CHECKLIST
+==============================
+
+Plan on about an hour. The first build downloads roughly 1 GB of Android tools.
+
+
+BEFORE YOU START
+----------------
+[ ] Laptop and TV are on the SAME Wi-Fi.
+[ ] Laptop is charged or plugged in, and has internet.
+[ ] Download LivingRoomHome-setup.zip to the laptop.
+    Right-click the zip > Properties > tick "Unblock" > OK.
+    Then right-click > Extract All, into e.g. Documents\LivingRoomHome.
+[ ] On the TV, turn on Developer options:
+      Settings > System > About > scroll to "Android TV OS build"
+      press OK on it 7 times, until it says you are a developer.
+[ ] On the TV, turn on debugging:
+      Settings > System > Developer options > USB debugging: ON
+      (if you also see "Wireless debugging", turn that ON too)
+[ ] Write down the TV's IP address:
+      Settings > Network & Internet > your Wi-Fi network > IP address (like 192.168.1.23)
+
+
+STEP 1 - SET UP THE TV (one file does everything)
+-------------------------------------------------
+[ ] Double-click 2-setup-tv.cmd. It first builds the app (the first time takes a few
+    minutes and downloads Android tools), then asks for the TV's IP address.
+    Use the same file again any time to update the home screen.
+[ ] On the TV: "Allow USB debugging?" > tick "Always allow from this computer" > Allow.
+    (Newer TVs may instead ask you to pair with a code: the script tells you where to find it.)
+[ ] The script backs up the TV first, then installs the new home screen.
+[ ] It asks you to test on the TV before anything is switched off:
+      Home button, spinning the carousel, opening Netflix,
+      Inputs > an HDMI input, Settings, and the mic button.
+    Only answer y if all of that works.
+[ ] It then asks about each change, one at a time:
+      Google's home screen (switched off, not deleted)
+      the new clock screensaver, and Google's photo screensaver
+      photo / file / USB player apps
+      ad, promotion and tracking apps
+    Answer y or n to each. Anything you are unsure about: answer n.
+[ ] When the ad settings open on the TV: Delete advertising ID,
+    and turn on Opt out of Ads Personalisation if you see it.
+
+
+STEP 2 - BY HAND ON THE TV
+--------------------------
+[ ] Chrome: do not sign in. If it is signed in: Chrome settings > Sync off, then sign out.
+    (This keeps your phone's history off the TV.)
+[ ] Settings > Privacy > Google Assistant (or Account): turn OFF Personal results,
+    so the Assistant cannot show your Google Photos or Drive.
+[ ] If the TV ever asks which home screen to use: Living Room Home > Always.
+
+
+STEP 3 - CLOSE IT UP (important)
+--------------------------------
+[ ] Settings > System > Developer options:
+      USB debugging: OFF
+      Wireless debugging: OFF
+    Leaving these on lets other devices on your Wi-Fi try to connect to the TV.
+[ ] Keep the extracted folder on the laptop. It holds the backup and restore-tv.cmd.
+
+
+IF ANYTHING GOES WRONG
+----------------------
+Double-click restore-tv.cmd (turn debugging on again first).
+It switches back on everything that was switched off, restores the screensaver,
+makes Google's home screen the home screen again, and can remove the new app.

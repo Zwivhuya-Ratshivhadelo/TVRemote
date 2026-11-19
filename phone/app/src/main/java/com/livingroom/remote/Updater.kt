@@ -1,0 +1,124 @@
+package com.livingroom.remote
+
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
+import android.os.Build
+import android.util.Log
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
+
+/**
+ * Updates over the internet, from the builds GitHub makes.
+ * GitHub puts each new build, locked with the TV key, on the "dist" branch of the TVRemote repo; this downloads it,
+ * unlocks it and hands it to Android to install. Nothing to do on the laptop.
+ */
+class Updater(private val ctx: Context, private val which: String) {
+
+    private val worker = Executors.newSingleThreadExecutor()
+    @Volatile private var busy = false
+
+    /** The newest build GitHub has made of this app, or null if it can't be reached. */
+    private fun latest(): Int? = try {
+        val v = JSONObject(String(get("version.json?t=" + System.currentTimeMillis() / 60000)))
+        v.optInt(which).takeIf { it > 0 }
+    } catch (e: Exception) { Log.w(TAG, "update check failed", e); null }
+
+    fun installed(): Long = try {
+        val p = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) p.longVersionCode else @Suppress("DEPRECATION") p.versionCode.toLong()
+    } catch (e: Exception) { 0L }
+
+    /**
+     * Looks for a newer build. When there is one it is downloaded and unlocked, then [ready] is called with it
+     * on a background thread; call [install] with it when it's a good moment.
+     */
+    fun check(ready: (File) -> Unit) {
+        if (busy) return
+        busy = true
+        worker.execute {
+            try {
+                val n = latest() ?: return@execute
+                if (n <= installed()) return@execute
+                val key = ctx.getString(R.string.link_key).trim()
+                val apk = Seal(key).open(get("$which.bin")) ?: run { Log.w(TAG, "update didn't unlock"); return@execute }
+                val f = File(ctx.cacheDir, "update-$which.apk"); f.writeBytes(apk)
+                // Only this app, and only newer than what is installed.
+                val info = ctx.packageManager.getPackageArchiveInfo(f.path, 0)
+                val code = if (info == null) 0L else if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+                if (info?.packageName != ctx.packageName || code <= installed()) { f.delete(); return@execute }
+                ready(f)
+            } catch (e: Exception) { Log.w(TAG, "update failed", e) }
+            finally { busy = false }
+        }
+    }
+
+    /** Hands the new build to Android. Android shows its install screen (on the TV the helper presses Install). */
+    fun install(f: File) {
+        worker.execute {
+            try {
+                val pi = ctx.packageManager.packageInstaller
+                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+                    setAppPackageName(ctx.packageName)
+                    if (Build.VERSION.SDK_INT >= 31) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                }
+                val id = pi.createSession(params)
+                pi.openSession(id).use { s ->
+                    s.openWrite("app.apk", 0, f.length()).use { out -> f.inputStream().use { it.copyTo(out) }; s.fsync(out) }
+                    val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
+                    val back = PendingIntent.getBroadcast(ctx, id, Intent(ACTION).setPackage(ctx.packageName), flags)
+                    s.commit(back.intentSender)
+                }
+                pending = true
+                pendingAt = System.currentTimeMillis()
+            } catch (e: Exception) { Log.w(TAG, "install failed", e) }
+        }
+    }
+
+    /** Android answers here: when it wants a yes, its install screen is opened. */
+    private val result = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            when (i.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)) {
+                PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                    @Suppress("DEPRECATION") val ask = i.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
+                    try { c.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { Log.w(TAG, "install screen", e) }
+                }
+                PackageInstaller.STATUS_SUCCESS -> pending = false
+                else -> { pending = false; Log.w(TAG, "install: " + i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)) }
+            }
+        }
+    }
+
+    fun start() {
+        try {
+            val f = IntentFilter(ACTION)
+            if (Build.VERSION.SDK_INT >= 33) ctx.registerReceiver(result, f, Context.RECEIVER_NOT_EXPORTED) else ctx.registerReceiver(result, f)
+        } catch (e: Exception) { }
+    }
+
+    fun stop() { try { ctx.unregisterReceiver(result) } catch (e: Exception) { } }
+
+    private fun get(name: String): ByteArray {
+        val c = URL(BASE + name).openConnection() as HttpURLConnection
+        c.connectTimeout = 10_000; c.readTimeout = 60_000
+        try {
+            if (c.responseCode != 200) throw java.io.IOException("HTTP " + c.responseCode)
+            return c.inputStream.use { it.readBytes() }
+        } finally { c.disconnect() }
+    }
+
+    companion object {
+        private const val TAG = "LivingRoomUpdate"
+        private const val BASE = "https://raw.githubusercontent.com/Zwivhuya-Ratshivhadelo/TVRemote/dist/"
+        private const val ACTION = "com.livingroom.remote.UPDATE_RESULT"
+        /** True while Android's install screen for our own update may be showing. */
+        @Volatile var pending = false
+        @Volatile var pendingAt = 0L
+    }
+}
