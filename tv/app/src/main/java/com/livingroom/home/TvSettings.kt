@@ -118,6 +118,8 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
     /** Asks Android once for Bluetooth access; the helper presses Allow. */
     private fun askBt() {
         if (android.os.Build.VERSION.SDK_INT < 31 || askingBt) return
+        // Only on the home screen, never over something you're watching.
+        if (!HomeActivity.showing) return
         askingBt = true; askedAt = System.currentTimeMillis()
         try { svc.startActivity(Intent(svc, PermissionActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { askingBt = false }
         // What Android's question looked like (sent along for checking), then carry on.
