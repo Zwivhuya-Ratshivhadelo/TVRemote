@@ -50,7 +50,6 @@ class SettingsActivity : Activity() {
         root.place(s, title, 62f + 130f, 66f, 260f, 40f)
         val items = listOf(
             Triple("Apps", R.drawable.ic_apps, null),
-            Triple("Picture", R.drawable.ic_picture, "picture"),
             Triple("Wi-Fi", R.drawable.ic_wifi, "wifi"),
             Triple("Bluetooth", R.drawable.ic_bluetooth, "bluetooth"))
         items.forEachIndexed { k, (name, icon, p) ->
