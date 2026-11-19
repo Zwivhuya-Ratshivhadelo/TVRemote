@@ -1,0 +1,176 @@
+{
+ "topics": [
+  "apps",
+  "art",
+  "cmd",
+  "on",
+  "state",
+  "tvset"
+ ],
+ "online": "1",
+ "state": {
+  "t": 1795127461126,
+  "v": 109,
+  "upd": "up to date (109)",
+  "dpad": "home got 23 focus=true",
+  "app": {
+   "pkg": "com.netflix.ninja",
+   "label": "Netflix"
+  },
+  "vol": {
+   "l": 28,
+   "m": 100,
+   "mu": false
+  },
+  "wx": {
+   "t": 21,
+   "label": "Cloudy"
+  }
+ },
+ "tvset": {
+  "wifi": {
+   "ssid": "low_2.4G.the101_MXMW",
+   "signal": "Fair",
+   "nets": [
+    {
+     "ssid": "MTN-2.4G-0AD9C1",
+     "lock": true
+    },
+    {
+     "ssid": "MTN-5G-0AD9C1",
+     "lock": true
+    },
+    {
+     "ssid": "low_2.4G.the101_KMZR",
+     "lock": true
+    },
+    {
+     "ssid": "DStv_Internet_AC5FD1",
+     "lock": true
+    },
+    {
+     "ssid": "5G.the101_high_MXMW",
+     "lock": true
+    }
+   ]
+  },
+  "bt": {
+   "on": true,
+   "devices": []
+  },
+  "picture": {
+   "sliders": [
+    {
+     "name": "Game",
+     "v": 100
+    },
+    {
+     "name": "Backlight",
+     "v": 30
+    },
+    {
+     "name": "Brightness",
+     "v": 50
+    },
+    {
+     "name": "Contrast",
+     "v": 50
+    },
+    {
+     "name": "Saturation",
+     "v": 80
+    },
+    {
+     "name": "HUE",
+     "v": 50
+    },
+    {
+     "name": "Sharpness",
+     "v": 50
+    }
+   ]
+  }
+ },
+ "apps": [
+  [
+   "Netflix",
+   true
+  ],
+  [
+   "YouTube",
+   true
+  ],
+  [
+   "Prime Video",
+   true
+  ],
+  [
+   "DStv",
+   true
+  ],
+  [
+   "Spotify",
+   true
+  ],
+  [
+   "SABC+",
+   true
+  ],
+  [
+   "Goojara",
+   true
+  ],
+  [
+   "CastPlayTV",
+   false
+  ],
+  [
+   "Daily Key",
+   false
+  ],
+  [
+   "Daily Manage",
+   false
+  ],
+  [
+   "Disney+",
+   false
+  ],
+  [
+   "E-Manual",
+   false
+  ],
+  [
+   "iQIYI",
+   false
+  ],
+  [
+   "Live TV",
+   false
+  ],
+  [
+   "MBC Shahid",
+   false
+  ],
+  [
+   "OSN+",
+   false
+  ],
+  [
+   "Play Games",
+   false
+  ],
+  [
+   "Play Store",
+   false
+  ],
+  [
+   "TV Bro",
+   false
+  ],
+  [
+   "YouTube Music",
+   false
+  ]
+ ]
+}
