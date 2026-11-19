@@ -277,7 +277,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             "settings" -> settings(o.optString("which"))
             "apps_get" -> publishApps()
             "update_check" -> svc.checkUpdate()
-            "tvset_get" -> tvset.get()
+            "tvset_get" -> tvset.get(o.optString("page"))
             "wifi_join" -> tvset.joinWifi(o.optString("ssid"), o.optString("pass"))
             "bt_power" -> tvset.btPower(o.optBoolean("on"))
             "bt_connect" -> tvset.btConnect(o.optString("addr"))

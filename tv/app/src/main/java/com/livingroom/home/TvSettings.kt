@@ -42,12 +42,13 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
     fun start() { watchProfiles() }
 
     /** The phone opened one of the pages: fresh news, and a Wi-Fi scan. */
-    fun get() {
+    fun get(page: String) {
         try { @Suppress("DEPRECATION") wifi.startScan() } catch (e: Exception) { }
-        if (!btAllowed()) askBt()
+        if (page == "bluetooth" && !btAllowed()) askBt()
         publish()
         main.postDelayed({ publish() }, 4000)
-        if (!prefs.contains("modes")) main.postDelayed({ readPicture() }, 1500)
+        // The picture menu is only read when you open Picture on the phone, and only until it has been read once.
+        if (page == "picture" && !prefs.contains("modes")) main.postDelayed({ readPicture() }, 800)
     }
 
     fun publish() {
@@ -55,6 +56,8 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         try { o.put("wifi", wifiJson()) } catch (e: Exception) { Log.w(TAG, "wifi", e) }
         try { o.put("bt", btJson()) } catch (e: Exception) { Log.w(TAG, "bt", e) }
         pictureJson()?.let { o.put("picture", it) }
+        MenuDriver.lastDump?.let { o.put("debug", it) }
+        permDump?.let { o.put("debugPerm", it) }
         send(o.toString())
     }
 
@@ -83,7 +86,7 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
     fun joinWifi(ssid: String, pass: String) {
         if (ssid.isBlank()) return
         val steps = ArrayList<Step>()
-        steps += Step("find $ssid", 12_000) { pressNamed(it, ssid) }
+        steps += Step("find $ssid", 12_000) { pressNamed(it, ssid, scroll = true) }
         if (pass.isNotEmpty()) steps += Step("password", 8000) { type(it, pass) }
         // Some TVs want "Connect" pressed as well; if there is none, it's already connecting.
         var at = 0L
@@ -105,6 +108,9 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         if (android.os.Build.VERSION.SDK_INT < 31 || askingBt) return
         askingBt = true; askedAt = System.currentTimeMillis()
         try { svc.startActivity(Intent(svc, PermissionActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { askingBt = false }
+        // What Android's question looked like (sent along for checking), then carry on.
+        main.postDelayed({ permDump = svc.rootInActiveWindow?.let { r -> JSONObject().put("pkg", r.packageName?.toString() ?: "")
+            .put("texts", JSONArray(MenuDriver.texts(r).distinct().take(40))) } }, 2500)
         main.postDelayed({ askingBt = false; watchProfiles(); publish() }, 8000)
     }
 
@@ -160,7 +166,7 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         if (!btAllowed()) { askBt(); return }
         val name = try { a.getRemoteDevice(addr).name } catch (e: Exception) { null } ?: return
         val steps = listOf(
-            Step("find $name", 12_000) { pressNamed(it, name) },
+            Step("find $name", 12_000) { pressNamed(it, name, scroll = true) },
             Step("connect", 8000) { pressNamed(it, "Connect") },
             MenuDriver.pause(3000))
         driver.run(Intent(Settings.ACTION_BLUETOOTH_SETTINGS), steps) { main.postDelayed({ publish() }, 3000) }
@@ -238,6 +244,7 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         private const val TAG = "LivingRoomSettings"
         /** While Android's "Allow Bluetooth?" question is ours, the helper presses Allow. */
         @Volatile var askingBt = false
+        @Volatile var permDump: JSONObject? = null
         @Volatile var askedAt = 0L
     }
 }

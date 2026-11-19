@@ -43,7 +43,13 @@ class MenuDriver(private val svc: HomeKeyService) {
             val now = SystemClock.uptimeMillis()
             when {
                 ok -> { steps.removeFirst(); stepAt = now; scrolls = 0; if (steps.isEmpty()) { finish(true); return } }
-                now - stepAt > step.wait -> { Log.w(TAG, "gave up at ${step.name}"); finish(false); return }
+                now - stepAt > step.wait -> {
+                    Log.w(TAG, "gave up at ${step.name}")
+                    // What was on screen when it gave up, so the steps can be fixed for this TV.
+                    lastDump = org.json.JSONObject().put("step", step.name).put("pkg", root?.packageName?.toString() ?: "")
+                        .put("texts", org.json.JSONArray(root?.let { texts(it).distinct().take(80) } ?: emptyList<String>()))
+                    finish(false); return
+                }
             }
             main.postDelayed(this, if (ok) 900 else 400)
         }
@@ -59,6 +65,8 @@ class MenuDriver(private val svc: HomeKeyService) {
 
     companion object {
         private const val TAG = "LivingRoomMenu"
+        /** The screen where the last menu run gave up (sent along for checking). */
+        @Volatile var lastDump: org.json.JSONObject? = null
 
         fun all(n: AccessibilityNodeInfo, out: MutableList<AccessibilityNodeInfo> = ArrayList()): MutableList<AccessibilityNodeInfo> {
             out += n
@@ -81,10 +89,10 @@ class MenuDriver(private val svc: HomeKeyService) {
             return c?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
         }
 
-        /** Finds and presses [text]; scrolls the list down a bit at a time while it isn't on screen yet. */
-        fun pressNamed(root: AccessibilityNodeInfo, text: String, loose: Boolean = false): Boolean {
+        /** Finds and presses [text]. In long lists ([scroll]) it moves down a bit at a time until it's on screen. */
+        fun pressNamed(root: AccessibilityNodeInfo, text: String, loose: Boolean = false, scroll: Boolean = false): Boolean {
             find(root, text, loose)?.let { return press(it) }
-            all(root).firstOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            if (scroll) all(root).firstOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
             return false
         }
 

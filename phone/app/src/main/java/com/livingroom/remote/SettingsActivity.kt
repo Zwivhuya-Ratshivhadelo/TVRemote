@@ -207,7 +207,7 @@ class SettingsActivity : Activity() {
 
     private fun lock() = LockGlyph(this).apply { minimumWidth = s.px(16); minimumHeight = s.px(16) }
 
-    override fun onStart() { super.onStart(); Hub.start(this); Hub.listen(onHub); if (page != null) { Hub.send("tvset_get"); fill() } }
+    override fun onStart() { super.onStart(); Hub.start(this); Hub.listen(onHub); if (page != null) { Hub.send("tvset_get", "page" to (page ?: "")); fill() } }
     override fun onStop() { Hub.unlisten(onHub); Hub.stop(); super.onStop() }
 
     companion object { val GREEN = Color.rgb(30, 215, 96) }
