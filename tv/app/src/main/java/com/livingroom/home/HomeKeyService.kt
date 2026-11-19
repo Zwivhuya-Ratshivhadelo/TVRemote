@@ -58,6 +58,7 @@ class HomeKeyService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         try {
             val filter = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_USER_PRESENT) }
             if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(screenOn, filter, Context.RECEIVER_EXPORTED)
@@ -73,9 +74,13 @@ class HomeKeyService : AccessibilityService() {
         try { unregisterReceiver(screenOn) } catch (e: Exception) { }
         link?.stop()
         updater?.stop()
+        if (instance === this) instance = null
         main.removeCallbacks(updateTick)
         super.onDestroy()
     }
+
+    /** Our home screen came up: nothing is open on the TV any more. */
+    fun homeShowing() { link?.onWindow(packageName) }
 
     fun openHome(force: Boolean = false): Boolean {
         val now = SystemClock.elapsedRealtime()
@@ -123,13 +128,14 @@ class HomeKeyService : AccessibilityService() {
     fun dpad(k: String) {
         val code = when (k) { "up" -> KeyEvent.KEYCODE_DPAD_UP; "down" -> KeyEvent.KEYCODE_DPAD_DOWN; "left" -> KeyEvent.KEYCODE_DPAD_LEFT
             "right" -> KeyEvent.KEYCODE_DPAD_RIGHT; else -> KeyEvent.KEYCODE_DPAD_CENTER }
-        if (HomeActivity.showing) { sendBroadcast(Intent(RemoteLink.DPAD).setPackage(packageName).putExtra("code", code)); return }
+        if (HomeActivity.showing) { lastDpad = "home $k"; sendBroadcast(Intent(RemoteLink.DPAD).setPackage(packageName).putExtra("code", code)); return }
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             val a = when (k) { "up" -> 16; "down" -> 17; "left" -> 18; "right" -> 19; else -> 20 }   // GLOBAL_ACTION_DPAD_*
             if (performGlobalAction(a)) return
         }
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow ?: run { lastDpad = "no window $k"; return }
         val cur = root.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+        lastDpad = "focus ${root.packageName} ${cur != null} $k"
         if (k == "ok") {
             var n = cur
             while (n != null && !n.isClickable) n = n.parent
@@ -166,6 +172,8 @@ class HomeKeyService : AccessibilityService() {
     companion object {
         private const val TAG = "LivingRoomHome"
         private const val GOOGLE_HOME = "com.google.android.apps.tv.launcherx"
+        @Volatile var instance: HomeKeyService? = null
+        @Volatile var lastDpad = ""
         private val INSTALLERS = setOf("com.google.android.packageinstaller", "com.android.packageinstaller")
         private val PERMISSION_UI = setOf("com.google.android.permissioncontroller", "com.android.permissioncontroller", "com.android.packageinstaller", "com.google.android.packageinstaller")
     }

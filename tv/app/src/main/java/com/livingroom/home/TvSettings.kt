@@ -195,7 +195,8 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
 
     /** The way into the picture panel: Settings > Display & Sound > Picture. */
     private fun toPicture() = listOf(
-        Step("picture", 9000) { r -> pressNamed(r, "Picture") || pressNamed(r, "Picture settings", loose = true) },
+        // On this TV the settings open straight on the Picture panel (its sliders are already there).
+        Step("picture", 9000) { r -> all(r).any { it.isVisibleToUser && it.rangeInfo != null } || pressNamed(r, "Picture") || pressNamed(r, "Picture settings", loose = true) },
         MenuDriver.pause(700))
 
     /** Every slider on the picture panel (Backlight, Contrast, ...), with its name and value. */

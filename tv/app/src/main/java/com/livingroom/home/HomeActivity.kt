@@ -141,6 +141,7 @@ class HomeActivity : Activity() {
     override fun onResume() {
         super.onResume()
         showing = true
+        HomeKeyService.instance?.homeShowing()
         main.removeCallbacks(ticker)
         ticker.run()
         refreshApps()
@@ -285,7 +286,8 @@ class HomeActivity : Activity() {
             if (i.action == RemoteLink.DPAD) {
                 // The phone's arrows and OK, on our own home screen: the same as the TV remote's.
                 val code = i.getIntExtra("code", 0)
-                if (code != 0 && hasWindowFocus()) {
+                HomeKeyService.lastDpad = "home got $code focus=${hasWindowFocus()}"
+                if (code != 0) {
                     dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code)); dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
                 }
             } else refreshApps()
