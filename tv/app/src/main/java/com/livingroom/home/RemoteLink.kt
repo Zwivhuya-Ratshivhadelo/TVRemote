@@ -285,6 +285,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         val c = controller?.transportControls
         when (k) {
             "home" -> svc.openHome(force = true)
+            "up", "down", "left", "right", "ok" -> svc.dpad(k)
             "back" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             "power" -> svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
             "mute" -> audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI)
@@ -375,6 +376,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         private const val TAG = "LivingRoomRemote"
         const val GOOGLE_HOME = "com.google.android.apps.tv.launcherx"
         const val HOME_LIST_CHANGED = "com.livingroom.home.HOME_LIST_CHANGED"
+        const val DPAD = "com.livingroom.home.DPAD"
         private val IGNORE = setOf("com.android.systemui", "com.google.android.tvrecommendations", "com.google.android.katniss",
             "com.android.inputmethod.latin", "com.google.android.inputmethod.latin", "com.google.android.leanback.ime",
             "org.liskovsoft.androidtv.rukeyboard", "com.google.android.tungsten.setupwraith")

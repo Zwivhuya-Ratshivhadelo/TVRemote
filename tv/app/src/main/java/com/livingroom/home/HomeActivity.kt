@@ -121,7 +121,7 @@ class HomeActivity : Activity() {
         setContentView(R.layout.activity_home)
         bind()
         try {
-            val f = IntentFilter(RemoteLink.HOME_LIST_CHANGED)
+            val f = IntentFilter(RemoteLink.HOME_LIST_CHANGED).apply { addAction(RemoteLink.DPAD) }
             if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(homeListChanged, f, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(homeListChanged, f)
         } catch (e: Exception) { }
         fitStageToScreen()
@@ -277,7 +277,15 @@ class HomeActivity : Activity() {
     private var halo: HaloView? = null
     private val iconColors = HashMap<String, Int>()
     private val homeListChanged = object : android.content.BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) { refreshApps() }
+        override fun onReceive(c: Context, i: Intent) {
+            if (i.action == RemoteLink.DPAD) {
+                // The phone's arrows and OK, on our own home screen: the same as the TV remote's.
+                val code = i.getIntExtra("code", 0)
+                if (code != 0 && hasWindowFocus()) {
+                    dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code)); dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                }
+            } else refreshApps()
+        }
     }
 
     /** The coloured shadow follows the selected app: it switches to the new app's colour and fades up. */

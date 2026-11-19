@@ -46,6 +46,9 @@ class RemoteActivity : Activity(), SensorEventListener {
     private lateinit var playView: FrameLayout
     private lateinit var gear: View
     private lateinit var grid: View
+    private lateinit var pad: ImageView
+    private lateinit var padView: FrameLayout
+    private var padOn = false
 
     // playing screen
     private lateinit var badgeIcon: Bubble
@@ -96,6 +99,9 @@ class RemoteActivity : Activity(), SensorEventListener {
         playView = FrameLayout(this).apply { alpha = 0f; visibility = View.GONE }
         root.addView(playView, FrameLayout.LayoutParams(-1, -1))
         buildPlay()
+        padView = FrameLayout(this).apply { alpha = 0f; visibility = View.GONE }
+        root.addView(padView, FrameLayout.LayoutParams(-1, -1))
+        buildPad()
 
         gear = ImageView(this).apply { setImageResource(R.drawable.ic_gear); setPadding(s.px(10), s.px(10), s.px(10), s.px(10))
             setOnClickListener { tap(it); startActivity(Intent(this@RemoteActivity, SettingsActivity::class.java)) } }
@@ -104,14 +110,17 @@ class RemoteActivity : Activity(), SensorEventListener {
             setOnClickListener { tap(it); forceApps = true; refresh() } }
         root.place(s, grid, 36f, 40f, 44f, 44f)
 
-        val row = listOf(
-            R.drawable.ic_back to { _: View -> Hub.send("key", "k" to "back") },
-            R.drawable.ic_home to { _: View -> Hub.send("key", "k" to "home") },
-            R.drawable.ic_mic to { _: View -> startActivity(Intent(this, VoiceActivity::class.java)) },
-            R.drawable.ic_keyboard to { _: View -> startActivity(Intent(this, TypeActivity::class.java)) },
-            R.drawable.ic_mute to { _: View -> Hub.send("key", "k" to "mute") },
-            R.drawable.ic_power to { _: View -> Hub.send("key", "k" to "power") })
-        row.forEachIndexed { i, (ic, fn) -> root.place(s, roundButton(s, ic, 52f, iconSize = 22f, onClick = fn), 40f + i * 62f, 770f, 52f, 52f) }
+        // The arrows-and-OK button, top left.
+        pad = ImageView(this).apply { setImageResource(R.drawable.ic_dpad); setPadding(s.px(9), s.px(9), s.px(9), s.px(9))
+            setOnClickListener { tap(it); padOn = !padOn; refresh() } }
+        root.place(s, pad, 36f, 40f, 42f, 42f)
+
+        // Bottom: mic, keyboard, home (big, in the middle), mute, power.
+        root.place(s, roundButton(s, R.drawable.ic_mic, 54f, iconSize = 22f) { startActivity(Intent(this, VoiceActivity::class.java)) }, 48f, 750f, 54f, 54f)
+        root.place(s, roundButton(s, R.drawable.ic_keyboard, 54f, iconSize = 22f) { startActivity(Intent(this, TypeActivity::class.java)) }, 116f, 750f, 54f, 54f)
+        root.place(s, roundButton(s, R.drawable.ic_home, 88f, white = true, iconSize = 30f) { padOn = false; Hub.send("key", "k" to "home"); refresh() }, 195f, 750f, 88f, 88f)
+        root.place(s, roundButton(s, R.drawable.ic_mute, 54f, iconSize = 22f) { Hub.send("key", "k" to "mute") }, 274f, 750f, 54f, 54f)
+        root.place(s, roundButton(s, R.drawable.ic_power, 54f, iconSize = 22f, red = true) { Hub.send("key", "k" to "power") }, 342f, 750f, 54f, 54f)
 
         volBar = VolumeBar(this).apply { alpha = 0f }
         root.place(s, volBar, 368f, 400f, 44f, 200f)
@@ -141,9 +150,9 @@ class RemoteActivity : Activity(), SensorEventListener {
         progressRow = listOf(progress, tStart, tEnd)
 
         val media = listOf("prev" to R.drawable.ic_prev, "rew" to R.drawable.ic_rew10, "playpause" to R.drawable.ic_pause, "fwd" to R.drawable.ic_fwd10, "next" to R.drawable.ic_next)
-        var x = 31f
+        var x = 27f
         for ((k, ic) in media) {
-            val white = k == "playpause"; val sz = if (white) 64f else 52f
+            val white = k == "playpause"; val sz = if (white) 72f else 52f
             val btn = roundButton(s, ic, sz, white = white, iconSize = if (white) 26f else 22f) { Hub.send("key", "k" to k) }
             if (k == "rew" || k == "fwd") btn.addView(text(s, 8f, bold = true).apply { this.text = "10" }, FrameLayout.LayoutParams(-1, -1))
             playView.place(s, btn, x + sz / 2f, 607f, sz, sz)
@@ -226,7 +235,7 @@ class RemoteActivity : Activity(), SensorEventListener {
     }
 
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-        if (!showingPlay && swipe.onTouchEvent(ev) && ev.actionMasked == android.view.MotionEvent.ACTION_UP) {
+        if (layer == "apps" && swipe.onTouchEvent(ev) && ev.actionMasked == android.view.MotionEvent.ACTION_UP) {
             // A swipe, not a tap: let go of whatever the finger started on.
             val c = android.view.MotionEvent.obtain(ev).apply { action = android.view.MotionEvent.ACTION_CANCEL }
             super.dispatchTouchEvent(c); c.recycle()
@@ -309,9 +318,13 @@ class RemoteActivity : Activity(), SensorEventListener {
 
         if (st?.app != lastApp) { lastApp = st?.app; forceApps = false }
         val play = st?.app != null && !forceApps
-        if (play != showingPlay) switchTo(play)
-        grid.visibility = if (play) View.VISIBLE else View.GONE
-        gear.visibility = if (play) View.GONE else View.VISIBLE
+        showLayer(if (padOn) "pad" else if (play) "play" else "apps")
+        showingPlay = play
+        // While an app is open on the TV the phone stays on it; only Home goes back to your apps.
+        grid.visibility = View.GONE
+        pad.background = if (padOn) GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) } else null
+        if (padOn) pad.setColorFilter(Color.BLACK) else pad.clearColorFilter()
+        glow.visibility = if (padOn) View.INVISIBLE else View.VISIBLE
 
         if (play && st != null) {
             val app = Hub.apps.firstOrNull { it.id == st.app }
@@ -342,14 +355,23 @@ class RemoteActivity : Activity(), SensorEventListener {
         tStart.text = fmt(p); tEnd.text = fmt(m.dur)
     }
 
-    private fun switchTo(play: Boolean) {
-        showingPlay = play
-        val show = if (play) playView else appsView
-        val hide = if (play) appsView else playView
-        show.visibility = View.VISIBLE
-        show.animate().alpha(1f).setDuration(260).start()
-        hide.animate().alpha(0f).setDuration(200).withEndAction { if (showingPlay == play) hide.visibility = View.GONE }.start()
-        glow.cy = if (play) 320f / 844f else 370f / 844f
+    private var layer = "apps"
+    /** Shows one of: your apps, what's playing, or the arrows and OK. */
+    private fun showLayer(which: String) {
+        if (which == layer && (when (which) { "pad" -> padView; "play" -> playView; else -> appsView }).visibility == View.VISIBLE) return
+        layer = which
+        for ((name, v) in listOf("apps" to appsView, "play" to playView, "pad" to padView)) {
+            if (name == which) { v.visibility = View.VISIBLE; v.animate().alpha(1f).setDuration(260).start() }
+            else v.animate().alpha(0f).setDuration(200).withEndAction { if (layer != name) v.visibility = View.GONE }.start()
+        }
+        glow.cy = if (which == "play") 320f / 844f else 370f / 844f
+    }
+
+    /** The arrows and OK: four curved keys around OK, and back beside them. */
+    private fun buildPad() {
+        val ring = DPad(this, s).apply { onKey = { k -> Hub.send("key", "k" to k) } }
+        padView.place(s, ring, 195f, 430f, 300f, 300f)
+        padView.place(s, roundButton(s, R.drawable.ic_back, 54f, iconSize = 22f) { Hub.send("key", "k" to "back") }, 62f, 630f, 54f, 54f)
     }
 
     private var glowAnim: ValueAnimator? = null

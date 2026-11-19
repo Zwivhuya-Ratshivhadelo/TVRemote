@@ -43,27 +43,30 @@ class SettingsActivity : Activity() {
     // ------------------------------------------------------------------------------- the menu
 
     private fun menu(root: FrameLayout) {
-        val title = text(s, 28f, bold = true).apply { text = "Settings"; gravity = Gravity.START or Gravity.CENTER_VERTICAL }
-        root.place(s, title, 24f + 130f, 72f, 260f, 40f)
-        val done = text(s, 17f, bold = true).apply { text = "Done"; setTextColor(GREEN); gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        val back = ImageView(this).apply { setImageResource(R.drawable.ic_back); setPadding(s.px(8), s.px(8), s.px(8), s.px(8))
             setOnClickListener { tap(it); finish() } }
-        root.place(s, done, 366f - 40f, 72f, 80f, 40f)
-        val tiles = listOf(
+        root.place(s, back, 36f, 66f, 40f, 40f)
+        val title = text(s, 28f, bold = true).apply { text = "Settings"; gravity = Gravity.START or Gravity.CENTER_VERTICAL }
+        root.place(s, title, 62f + 130f, 66f, 260f, 40f)
+        val items = listOf(
             Triple("Apps", R.drawable.ic_apps, null),
             Triple("Picture", R.drawable.ic_picture, "picture"),
             Triple("Wi-Fi", R.drawable.ic_wifi, "wifi"),
             Triple("Bluetooth", R.drawable.ic_bluetooth, "bluetooth"))
-        tiles.forEachIndexed { k, (name, icon, p) ->
-            val tile = FrameLayout(this).apply { background = roundBg(Color.argb(18, 255, 255, 255), s.px(28f)) }
-            val circle = FrameLayout(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.argb(26, 255, 255, 255)) } }
-            circle.addView(ImageView(this).apply { setImageResource(icon) }, FrameLayout.LayoutParams(s.px(26), s.px(26), Gravity.CENTER))
-            tile.addView(circle, FrameLayout.LayoutParams(s.px(56), s.px(56), Gravity.START or Gravity.CENTER_VERTICAL).apply { leftMargin = s.px(26) })
-            tile.addView(text(s, 20f, bold = true).apply { text = name; gravity = Gravity.START or Gravity.CENTER_VERTICAL },
-                FrameLayout.LayoutParams(-1, -1).apply { leftMargin = s.px(102) })
-            tile.setOnClickListener { tap(it)
+        items.forEachIndexed { k, (name, icon, p) ->
+            val row = FrameLayout(this)
+            row.addView(ImageView(this).apply { setImageResource(icon) },
+                FrameLayout.LayoutParams(s.px(26), s.px(26), Gravity.START or Gravity.CENTER_VERTICAL))
+            row.addView(text(s, 20f).apply { text = name; typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL }, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = s.px(46) })
+            row.addView(ImageView(this).apply { setImageResource(R.drawable.ic_chevron) },
+                FrameLayout.LayoutParams(s.px(20), s.px(20), Gravity.END or Gravity.CENTER_VERTICAL))
+            row.addView(View(this).apply { setBackgroundColor(Color.argb(20, 255, 255, 255)) },
+                FrameLayout.LayoutParams(-1, maxOf(1, s.px(1)), Gravity.BOTTOM))
+            row.setOnClickListener { tap(it)
                 if (p == null) startActivity(Intent(this, AppsActivity::class.java))
                 else startActivity(Intent(this, SettingsActivity::class.java).putExtra("page", p)) }
-            root.place(s, tile, 195f, 220f + k * 130f, 342f, 104f)
+            root.place(s, row, 195f, 178f + k * 76f, 342f, 76f)
         }
     }
 
@@ -140,11 +143,15 @@ class SettingsActivity : Activity() {
             setTextColor(Color.WHITE); setHintTextColor(Color.argb(120, 255, 255, 255)); setTextSize(TypedValue.COMPLEX_UNIT_PX, s.px(16f))
             background = roundBg(Color.argb(20, 255, 255, 255), s.px(20f)); setPadding(s.px(18), 0, s.px(18), 0)
         }
-        list.addView(box, LinearLayout.LayoutParams(-1, s.px(56)).apply { topMargin = s.px(10) })
-        val join = text(s, 16f, bold = true).apply { text = "Join"; setTextColor(Color.BLACK); background = roundBg(Color.WHITE, s.px(26f))
-            setOnClickListener { tap(it); val pw = box.text.toString(); if (pw.isEmpty()) return@setOnClickListener
-                Hub.send("wifi_join", "ssid" to name, "pass" to pw); joining = null; fill() } }
-        list.addView(join, LinearLayout.LayoutParams(-1, s.px(52)).apply { topMargin = s.px(10) })
+        // The password box, with a round arrow in it to join.
+        val line = FrameLayout(this)
+        box.setPadding(s.px(18), 0, s.px(60), 0)
+        line.addView(box, FrameLayout.LayoutParams(-1, -1))
+        line.addView(roundButton(s, R.drawable.ic_send, 44f, iconSize = 20f) {
+            val pw = box.text.toString(); if (pw.isEmpty()) return@roundButton
+            Hub.send("wifi_join", "ssid" to name, "pass" to pw); joining = null; fill()
+        }, FrameLayout.LayoutParams(s.px(44), s.px(44), Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = s.px(6) })
+        list.addView(line, LinearLayout.LayoutParams(-1, s.px(56)).apply { topMargin = s.px(10) })
         box.requestFocus()
     }
 
@@ -175,8 +182,8 @@ class SettingsActivity : Activity() {
     // ------------------------------------------------------------------------------- pieces
 
     private fun label(t: String) {
-        list.addView(text(s, 13f, alpha = 0.55f, spacing = 0.08f).apply { text = t; gravity = Gravity.START or Gravity.BOTTOM },
-            LinearLayout.LayoutParams(-1, s.px(40)))
+        list.addView(text(s, 13f, alpha = 0.5f, spacing = 0.08f).apply { text = t; gravity = Gravity.START or Gravity.BOTTOM },
+            LinearLayout.LayoutParams(-1, s.px(44)))
     }
 
     private fun note(t: String) {
@@ -185,17 +192,18 @@ class SettingsActivity : Activity() {
     }
 
     private fun row(title: String, sub: String? = null, right: View? = null, onTap: (() -> Unit)? = null) {
-        val r = FrameLayout(this).apply { background = roundBg(Color.argb(16, 255, 255, 255), s.px(20f)) }
+        val r = FrameLayout(this)
+        r.addView(View(this).apply { setBackgroundColor(Color.argb(20, 255, 255, 255)) }, FrameLayout.LayoutParams(-1, maxOf(1, s.px(1)), Gravity.BOTTOM))
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL }
-        col.addView(text(s, 17f, bold = true).apply { text = title; gravity = Gravity.START }, LinearLayout.LayoutParams(-1, -2))
+        col.addView(text(s, 18f).apply { text = title; gravity = Gravity.START; typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL) }, LinearLayout.LayoutParams(-1, -2))
         if (sub != null) col.addView(text(s, 12f, alpha = 0.55f).apply { text = sub; gravity = Gravity.START }, LinearLayout.LayoutParams(-1, -2))
-        r.addView(col, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = s.px(18); rightMargin = s.px(90) })
-        if (right != null) r.addView(right, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = s.px(18) })
+        r.addView(col, FrameLayout.LayoutParams(-1, -1).apply { rightMargin = s.px(90) })
+        if (right != null) r.addView(right, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
         if (onTap != null) r.setOnClickListener { tap(it); onTap() }
-        list.addView(r, LinearLayout.LayoutParams(-1, s.px(62)).apply { topMargin = s.px(10) })
+        list.addView(r, LinearLayout.LayoutParams(-1, s.px(68)))
     }
 
-    private fun tick() = ImageView(this).apply { setImageResource(R.drawable.ic_check); setColorFilter(GREEN) }
+    private fun tick() = ImageView(this).apply { setImageResource(R.drawable.ic_check); setColorFilter(Color.WHITE) }
 
     private fun lock() = LockGlyph(this).apply { minimumWidth = s.px(16); minimumHeight = s.px(16) }
 
@@ -234,8 +242,8 @@ class SettingsActivity : Activity() {
         override fun onMeasure(w: Int, h: Int) { val d = resources.displayMetrics.density; setMeasuredDimension((52 * d).toInt(), (30 * d).toInt()) }
         override fun onDraw(c: Canvas) {
             val h = height.toFloat(); val r = h / 2
-            p.color = if (on) GREEN else Color.argb(46, 255, 255, 255); c.drawRoundRect(0f, 0f, width.toFloat(), h, r, r, p)
-            p.color = Color.WHITE; val k = h * 0.4f
+            p.color = if (on) Color.WHITE else Color.argb(46, 255, 255, 255); c.drawRoundRect(0f, 0f, width.toFloat(), h, r, r, p)
+            p.color = if (on) Color.BLACK else Color.WHITE; val k = h * 0.4f
             c.drawCircle(if (on) width - r else r, r, k, p)
         }
     }

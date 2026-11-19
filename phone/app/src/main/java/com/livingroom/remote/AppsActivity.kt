@@ -34,8 +34,6 @@ class AppsActivity : Activity() {
         root.place(s, back, 36f, 66f, 40f, 40f)
         val title = text(s, 28f, bold = true).apply { this.text = "Apps"; gravity = Gravity.START or Gravity.CENTER_VERTICAL }
         root.place(s, title, 62f + 130f, 66f, 260f, 40f)
-        val hint = text(s, 14f, alpha = 0.6f).apply { this.text = "Tap to add or remove from the TV home screen"; gravity = Gravity.START or Gravity.CENTER_VERTICAL }
-        root.place(s, hint, 24f + 171f, 102f, 342f, 22f)
 
         val box = FrameLayout(this).apply { background = GradientDrawable().apply { setColor(Color.argb(20, 255, 255, 255)); cornerRadius = s.px(22f) } }
         box.addView(SearchGlyph(this).apply { alpha = 0.7f },
@@ -56,12 +54,12 @@ class AppsActivity : Activity() {
             setOnEditorActionListener { v, _, _ -> (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(v.windowToken, 0); true }
         }
         box.addView(search, FrameLayout.LayoutParams(-1, -1))
-        root.place(s, box, 195f, 148f, 342f, 44f)
+        root.place(s, box, 195f, 128f, 342f, 44f)
 
         val scroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false }
         grid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, s.px(6), 0, s.px(40)) }
         scroll.addView(grid)
-        root.addView(scroll, FrameLayout.LayoutParams(-1, -1).apply { topMargin = s.px(184) })
+        root.addView(scroll, FrameLayout.LayoutParams(-1, -1).apply { topMargin = s.px(160) })
         fill()
     }
 
@@ -77,21 +75,25 @@ class AppsActivity : Activity() {
         val onLabels = all.filter { it.on }.map { it.label.trim().lowercase() }
         // One of each: "DStv Stream" is the same app as "DStv" on the home screen.
         val apps = all.filter { a -> a.on || onLabels.none { a.label.trim().lowercase().startsWith("$it ") } }
-            .filter { if (q.isEmpty()) it.on || !(it.sys || isExtra(it.label)) else it.label.lowercase().contains(q) }
-        if (apps.isEmpty() && q.isEmpty()) { note("Waiting for the TV…"); return }
-        section("ON THE TV HOME SCREEN", apps.filter { it.on })
-        section(if (q.isEmpty()) "MORE APPS" else "ON THE TV", apps.filter { !it.on })
+        // Only your home screen apps; everything else is found by searching.
+        if (q.isEmpty()) {
+            val home = apps.filter { it.on }
+            if (home.isEmpty()) note("Waiting for the TV…") else section(null, home)
+            return
+        }
+        val local = apps.filter { it.label.lowercase().contains(q) }
+        section(null, local.filter { it.on } + local.filter { !it.on })
         if (q.length < 2) return
         // Apps you don't have yet: from Google Play, tap to install on the TV.
         val f = Hub.found
         val have = Hub.apps.map { it.id }.toSet()
         if (f == null || f.first != query) {
             if (System.currentTimeMillis() - askedAt > 8500) return   // the TV didn't answer: show only what it has
-            header("FROM GOOGLE PLAY"); note(if (Hub.tvOnline) "Searching…" else "The TV is off"); return
+            if (local.isEmpty()) note(if (Hub.tvOnline) "Searching…" else "The TV is off"); return
         }
         val play = f.second.filter { it.id !in have }
-        if (play.isEmpty()) { header("FROM GOOGLE PLAY"); note(if (Hub.foundFailed) "Google Play didn't answer" else "Nothing on Google Play called \"$query\""); return }
-        section("FROM GOOGLE PLAY", play, store = true)
+        if (play.isEmpty() && local.isEmpty()) { note("Nothing called \"$query\""); return }
+        section(null, play, store = true)
     }
 
     /** The TV maker's built-in extras: only shown when you search for them. */
@@ -107,9 +109,9 @@ class AppsActivity : Activity() {
             LinearLayout.LayoutParams(-1, s.px(40)).apply { leftMargin = (s.offX + s.px(28f)).toInt() })
     }
 
-    private fun section(name: String, list: List<TvApp>, store: Boolean = false) {
+    private fun section(name: String?, list: List<TvApp>, store: Boolean = false) {
         if (list.isEmpty()) return
-        header(name)
+        if (name != null) header(name) else grid.addView(View(this), LinearLayout.LayoutParams(-1, s.px(10)))
         val cols = 4
         for (r in list.chunked(cols)) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_HORIZONTAL }
@@ -126,7 +128,7 @@ class AppsActivity : Activity() {
         // Bubble 64 wide, centred in the 86-wide cell; the badge sits on its top-right edge.
         c.addView(bub, FrameLayout.LayoutParams(s.px(64), s.px(64), Gravity.START or Gravity.TOP).apply { leftMargin = s.px(11); topMargin = s.px(8) })
         val badge = FrameLayout(this).apply {
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (a.on) Color.rgb(30, 215, 96) else Color.rgb(58, 60, 68)); setStroke(s.px(3), Color.BLACK) }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (a.on) Color.WHITE else Color.rgb(58, 60, 68)); setStroke(s.px(3), Color.BLACK) }
         }
         badge.addView(ImageView(this).apply { setImageResource(if (a.on) R.drawable.ic_check else R.drawable.ic_plus); if (a.on) setColorFilter(Color.BLACK) },
             FrameLayout.LayoutParams(s.px(12), s.px(12), Gravity.CENTER))

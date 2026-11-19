@@ -111,6 +111,37 @@ class HomeKeyService : AccessibilityService() {
         if (cls.isEmpty() || cls.contains("HomeActivity") || cls.contains("MainActivity")) openHome()
     }
 
+    /**
+     * The phone's arrows and OK. On our home screen they go straight to it; elsewhere the helper moves the TV's
+     * focus to the next item in that direction (Android 12 has no way for an app to press the remote's arrows).
+     */
+    fun dpad(k: String) {
+        val code = when (k) { "up" -> KeyEvent.KEYCODE_DPAD_UP; "down" -> KeyEvent.KEYCODE_DPAD_DOWN; "left" -> KeyEvent.KEYCODE_DPAD_LEFT
+            "right" -> KeyEvent.KEYCODE_DPAD_RIGHT; else -> KeyEvent.KEYCODE_DPAD_CENTER }
+        if (front == packageName) { sendBroadcast(Intent(RemoteLink.DPAD).setPackage(packageName).putExtra("code", code)); return }
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val a = when (k) { "up" -> 16; "down" -> 17; "left" -> 18; "right" -> 19; else -> 20 }   // GLOBAL_ACTION_DPAD_*
+            if (performGlobalAction(a)) return
+        }
+        val root = rootInActiveWindow ?: return
+        val cur = root.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+        if (k == "ok") {
+            var n = cur
+            while (n != null && !n.isClickable) n = n.parent
+            n?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+            return
+        }
+        val dir = when (k) { "up" -> android.view.View.FOCUS_UP; "down" -> android.view.View.FOCUS_DOWN; "left" -> android.view.View.FOCUS_LEFT; else -> android.view.View.FOCUS_RIGHT }
+        val next = cur?.focusSearch(dir) ?: firstFocusable(root)
+        next?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS)
+    }
+
+    private fun firstFocusable(n: android.view.accessibility.AccessibilityNodeInfo): android.view.accessibility.AccessibilityNodeInfo? {
+        if (n.isFocusable && n.isVisibleToUser) return n
+        for (i in 0 until n.childCount) n.getChild(i)?.let { c -> firstFocusable(c)?.let { return it } }
+        return null
+    }
+
     /** Our own update is on Android's install screen: press its Install / Update button. */
     private fun pressInstall() {
         val root = rootInActiveWindow ?: return

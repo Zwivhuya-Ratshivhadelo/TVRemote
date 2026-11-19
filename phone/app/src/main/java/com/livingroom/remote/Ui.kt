@@ -53,10 +53,22 @@ fun tap(v: View) { v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) 
 
 fun roundBg(color: Int, radius: Float) = GradientDrawable().apply { setColor(color); cornerRadius = radius }
 
-/** A round button with an icon. White = the main one (play/pause). */
-fun Context.roundButton(s: Scale, icon: Int, size: Float, white: Boolean = false, iconSize: Float = 24f, onClick: (View) -> Unit): FrameLayout {
+/** Dark metal key, the look of every button. */
+fun metal(s: Scale, red: Boolean = false) = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.rgb(0x34, 0x36, 0x3d), Color.rgb(0x18, 0x19, 0x1d))).apply {
+    shape = GradientDrawable.OVAL; setStroke(maxOf(1, s.px(1)), if (red) Color.argb(102, 255, 90, 99) else Color.argb(26, 255, 255, 255))
+}
+
+/** The main key (home, play/pause, mic): black, a thin light ring, and a dark collar around it. */
+fun ringKey(s: Scale) = android.graphics.drawable.LayerDrawable(arrayOf(
+    GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(0x1d, 0x1e, 0x22)) },
+    GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(0x0c, 0x0d, 0x0f)); setStroke(maxOf(1, s.px(1.5f).toInt()), Color.argb(90, 255, 255, 255)) })).apply {
+    val inset = s.px(6); setLayerInset(1, inset, inset, inset, inset)
+}
+
+/** A round button with an icon. big = the main one (home, play/pause). */
+fun Context.roundButton(s: Scale, icon: Int, size: Float, white: Boolean = false, iconSize: Float = 24f, red: Boolean = false, onClick: (View) -> Unit): FrameLayout {
     val f = FrameLayout(this)
-    f.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (white) Color.WHITE else Color.argb(18, 255, 255, 255)) }
+    f.background = if (white) ringKey(s) else metal(s, red)
     val img = ImageView(this).apply { setImageResource(icon); tag = "icon" }
     f.addView(img, FrameLayout.LayoutParams(s.px(iconSize).toInt(), s.px(iconSize).toInt(), Gravity.CENTER))
     f.isClickable = true

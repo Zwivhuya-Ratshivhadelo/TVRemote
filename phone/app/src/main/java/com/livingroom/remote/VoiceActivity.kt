@@ -29,15 +29,14 @@ class VoiceActivity : Activity() {
         s = Scale(this)
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         setContentView(root)
-        root.addView(Glow(this).apply { color = Color.rgb(66, 133, 244); cy = 520f / 844f }, FrameLayout.LayoutParams(-1, -1))
         said = text(s, 34f, bold = true).apply { maxLines = 3 }
         root.place(s, said, 195f, 300f, 350f, 140f)
         ring2 = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.argb(10, 255, 255, 255)) } }
         root.place(s, ring2, 195f, 520f, 246f, 246f)
         ring1 = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.argb(20, 255, 255, 255)) } }
         root.place(s, ring1, 195f, 520f, 194f, 194f)
-        val mic = FrameLayout(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) } }
-        mic.addView(ImageView(this).apply { setImageResource(R.drawable.ic_mic_dark) }, FrameLayout.LayoutParams(s.px(56), s.px(56), Gravity.CENTER))
+        val mic = FrameLayout(this).apply { background = ringKey(s) }
+        mic.addView(ImageView(this).apply { setImageResource(R.drawable.ic_mic) }, FrameLayout.LayoutParams(s.px(56), s.px(56), Gravity.CENTER))
         mic.setOnClickListener { tap(it); listen() }
         root.place(s, mic, 195f, 520f, 150f, 150f)
         root.place(s, roundButton(s, R.drawable.ic_close, 66f) { finish() }, 195f, 760f, 66f, 66f)
