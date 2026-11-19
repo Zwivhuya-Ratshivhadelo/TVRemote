@@ -96,6 +96,7 @@ class SettingsActivity : Activity() {
         when (page) { "picture" -> picture(part); "wifi" -> wifi(part); else -> bluetooth(part) }
     }
 
+    /** The TV's own picture panel: its modes (if it lists them) and every slider on it, Backlight, Contrast and so on. */
     private fun picture(p: JSONObject) {
         val modes = p.optJSONArray("modes")
         if (modes != null && modes.length() > 0) {
@@ -106,11 +107,14 @@ class SettingsActivity : Activity() {
                 row(m, right = if (m == cur) tick() else null) { Hub.send("picture_mode", "mode" to m); setLocal("picture", "mode", m) }
             }
         }
-        if (p.has("backlight")) {
-            label("BACKLIGHT")
-            val bar = Slider(this).apply { frac = p.optInt("backlight") / 100f
+        val sliders = p.optJSONArray("sliders") ?: return
+        for (k in 0 until sliders.length()) {
+            val sl = sliders.optJSONObject(k) ?: continue
+            val name = sl.optString("name")
+            label(name.uppercase())
+            val bar = Slider(this).apply { frac = sl.optInt("v") / 100f
                 onMove = { dragging = true }
-                onDone = { f -> dragging = false; val v = (f * 100).toInt(); Hub.send("backlight", "v" to v); setLocal("picture", "backlight", v) } }
+                onDone = { f -> dragging = false; val v = (f * 100).toInt(); sl.put("v", v); Hub.send("picture_set", "name" to name, "v" to v) } }
             list.addView(bar, LinearLayout.LayoutParams(-1, s.px(34)).apply { topMargin = s.px(12) })
         }
     }
@@ -128,10 +132,9 @@ class SettingsActivity : Activity() {
                 val n = nets.optJSONObject(i) ?: continue
                 val name = n.optString("ssid"); if (name.isEmpty() || name == ssid) continue
                 val locked = n.optBoolean("lock")
-                row(name, right = if (locked) lock() else null) {
-                    if (locked) { joining = if (joining == name) null else name; fill() } else Hub.send("wifi_join", "ssid" to name)
-                }
-                if (joining == name) password(name)
+                // Tap: the TV tries to join. Saved networks just connect; the password box only shows when the TV asks for one.
+                row(name, right = if (locked) lock() else null) { joining = null; Hub.send("wifi_join", "ssid" to name); fill() }
+                if (joining == name || w.optString("needPass") == name) password(name)
             }
         }
     }

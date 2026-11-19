@@ -17,19 +17,24 @@ import android.view.accessibility.AccessibilityNodeInfo
 class MenuDriver(private val svc: HomeKeyService) {
 
     /** One step: returns true once it has done its job on the screen that is showing. */
-    class Step(val name: String, val wait: Long = 7000, val run: (AccessibilityNodeInfo) -> Boolean)
+    /** [optional]: if it can't be done in time, carry on with the next step instead of stopping. */
+    class Step(val name: String, val wait: Long = 7000, val optional: Boolean = false, val run: (AccessibilityNodeInfo) -> Boolean)
 
     private val main = Handler(Looper.getMainLooper())
     private val steps = ArrayDeque<Step>()
     private var stepAt = 0L
     private var done: ((Boolean) -> Unit)? = null
     private var scrolls = 0
+    /** The menus this run opened (only these get closed again, never the app you were watching). */
+    private val opened = HashSet<String>()
+    private var before: String? = null
 
     val busy: Boolean get() = steps.isNotEmpty()
 
     fun run(open: Intent?, list: List<Step>, finished: (Boolean) -> Unit) {
         if (busy) { finished(false); return }
         steps.clear(); steps.addAll(list); done = finished; scrolls = 0
+        opened.clear(); before = try { svc.rootInActiveWindow?.packageName?.toString() } catch (e: Exception) { null }
         stepAt = SystemClock.uptimeMillis()
         if (open != null) try { svc.startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { finish(false); return }
         main.postDelayed(tick, 700)
@@ -39,10 +44,12 @@ class MenuDriver(private val svc: HomeKeyService) {
         override fun run() {
             val step = steps.firstOrNull() ?: return
             val root = try { svc.rootInActiveWindow } catch (e: Exception) { null }
+            root?.packageName?.toString()?.let { if (it != before && it != svc.packageName) opened += it }
             val ok = root != null && try { step.run(root) } catch (e: Exception) { Log.w(TAG, "step ${step.name}", e); false }
             val now = SystemClock.uptimeMillis()
             when {
                 ok -> { steps.removeFirst(); stepAt = now; scrolls = 0; if (steps.isEmpty()) { finish(true); return } }
+                now - stepAt > step.wait && step.optional -> { steps.removeFirst(); stepAt = now; if (steps.isEmpty()) { finish(true); return } }
                 now - stepAt > step.wait -> {
                     Log.w(TAG, "gave up at ${step.name}")
                     // What was on screen when it gave up, so the steps can be fixed for this TV.
@@ -58,7 +65,22 @@ class MenuDriver(private val svc: HomeKeyService) {
     private fun finish(ok: Boolean) {
         steps.clear(); main.removeCallbacks(tick)
         val d = done; done = null
-        main.postDelayed({ svc.openHome(force = true); d?.invoke(ok) }, if (ok) 1200 else 300)
+        // Close whatever menu or panel is still open (Back, up to 4 times), then the home screen.
+        var n = 0
+        val close = object : Runnable {
+            override fun run() {
+                val pkg = try { svc.rootInActiveWindow?.packageName?.toString() } catch (e: Exception) { null }
+                if (pkg != null && pkg in opened && n++ < 4) {
+                    svc.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                    main.postDelayed(this, 350)
+                } else {
+                    // Back to where you were: the home screen, or the app you were watching.
+                    if (before == null || before == svc.packageName || before in opened) svc.openHome(force = true)
+                    d?.invoke(ok)
+                }
+            }
+        }
+        main.postDelayed(close, if (ok) 800 else 200)
     }
 
     // ------------------------------------------------------------------------------- what steps use

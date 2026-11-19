@@ -48,7 +48,7 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         publish()
         main.postDelayed({ publish() }, 4000)
         // The picture menu is only read when you open Picture on the phone, and only until it has been read once.
-        if (page == "picture" && !prefs.contains("modes")) main.postDelayed({ readPicture() }, 800)
+        if (page == "picture" && !prefs.contains("picture")) main.postDelayed({ readPicture() }, 800)
     }
 
     fun publish() {
@@ -80,22 +80,34 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
             nets.put(JSONObject().put("ssid", r.SSID).put("lock", listOf("WPA", "WEP", "SAE", "PSK", "EAP").any { caps.contains(it) }))
         }
         o.put("nets", nets)
+        if (needPass.isNotEmpty() && needPass != ssid) o.put("needPass", needPass)
         return o
     }
 
+    /** The network the TV asked a password for (the phone then shows the password box for it). */
+    private var needPass = ""
+
+    /**
+     * Joins [ssid]. Saved networks connect straight away; only when the TV asks for a password, and none was
+     * given, the phone is told to ask you for it.
+     */
     fun joinWifi(ssid: String, pass: String) {
         if (ssid.isBlank()) return
+        needPass = ""
         val steps = ArrayList<Step>()
         steps += Step("find $ssid", 12_000) { pressNamed(it, ssid, scroll = true) }
-        if (pass.isNotEmpty()) steps += Step("password", 8000) { type(it, pass) }
+        steps += Step("password?", 4500, optional = true) { r ->
+            val box = all(r).firstOrNull { it.isEditable && it.isVisibleToUser } ?: return@Step false
+            if (pass.isEmpty()) { needPass = ssid; true } else type(r, pass)
+        }
         // Some TVs want "Connect" pressed as well; if there is none, it's already connecting.
         var at = 0L
-        steps += Step("connect", 8000) { r ->
+        steps += Step("connect", 6000, optional = true) { r ->
+            if (needPass.isNotEmpty()) return@Step true
             if (at == 0L) at = android.os.SystemClock.uptimeMillis()
             pressNamed(r, "Connect") || android.os.SystemClock.uptimeMillis() - at > 2500
         }
-        steps += MenuDriver.pause(3000)
-        driver.run(Intent(Settings.ACTION_WIFI_SETTINGS), steps) { main.postDelayed({ publish() }, 6000) }
+        driver.run(Intent(Settings.ACTION_WIFI_SETTINGS), steps) { publish(); main.postDelayed({ publish() }, 6000) }
     }
 
     // ------------------------------------------------------------------------------- Bluetooth
@@ -111,6 +123,8 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
         // What Android's question looked like (sent along for checking), then carry on.
         main.postDelayed({ permDump = svc.rootInActiveWindow?.let { r -> JSONObject().put("pkg", r.packageName?.toString() ?: "")
             .put("texts", JSONArray(MenuDriver.texts(r).distinct().take(40))) } }, 2500)
+        // Press Allow from here too, in case the question showed without the helper being told.
+        for (d in listOf(1200L, 2500L, 4000L)) main.postDelayed({ if (askingBt) svc.rootInActiveWindow?.let { r -> if (MenuDriver.press(MenuDriver.find(r, "Allow"))) askingBt = false } }, d)
         main.postDelayed({ askingBt = false; watchProfiles(); publish() }, 8000)
     }
 
@@ -175,61 +189,91 @@ class TvSettings(private val svc: HomeKeyService, private val send: (String) -> 
     // ------------------------------------------------------------------------------- Picture
 
     private fun pictureJson(): JSONObject? {
-        val modes = prefs.getString("modes", null)?.split('\n')?.filter { it.isNotBlank() } ?: return null
-        val o = JSONObject().put("modes", JSONArray(modes)).put("mode", prefs.getString("mode", ""))
-        if (prefs.contains("backlight")) o.put("backlight", prefs.getInt("backlight", 50))
-        return o
+        val raw = prefs.getString("picture", null) ?: return null
+        return try { JSONObject(raw) } catch (e: Exception) { null }
     }
 
-    /** The way into the picture menu: Settings > Display & Sound (or similar) > Picture. */
+    /** The way into the picture panel: Settings > Display & Sound > Picture. */
     private fun toPicture() = listOf(
-        Step("picture", 9000) { r -> pressNamed(r, "Picture") || pressNamed(r, "Picture settings", loose = true) })
+        Step("picture", 9000) { r -> pressNamed(r, "Picture") || pressNamed(r, "Picture settings", loose = true) },
+        MenuDriver.pause(700))
 
-    /** Reads the TV's picture modes (and the backlight) once, so the phone can show them. */
+    /** Every slider on the picture panel (Backlight, Contrast, ...), with its name and value. */
+    private fun sliders(r: AccessibilityNodeInfo): List<Pair<String, AccessibilityNodeInfo>> {
+        val out = ArrayList<Pair<String, AccessibilityNodeInfo>>()
+        for (bar in all(r).filter { it.isVisibleToUser && it.rangeInfo != null }) {
+            // Its name is the first word-like text in the row around it.
+            var row: AccessibilityNodeInfo? = bar.parent; var name = ""
+            repeat(3) {
+                if (name.isEmpty() && row != null) {
+                    name = all(row!!).map { label(it) }.firstOrNull { it.isNotEmpty() && it.any { c -> c.isLetter() } } ?: ""
+                    if (name.isEmpty()) row = row!!.parent
+                }
+            }
+            if (name.isNotEmpty() && out.none { it.first == name }) out += name to bar
+        }
+        return out
+    }
+
+    private fun pct(n: AccessibilityNodeInfo): Int {
+        val ri = n.rangeInfo ?: return 0
+        return if (ri.max > ri.min) Math.round((ri.current - ri.min) * 100f / (ri.max - ri.min)) else 0
+    }
+
+    /** Reads the picture panel: the sliders, and the picture modes if the TV lists them. */
     fun readPicture() {
         if (driver.busy) return
+        val pic = JSONObject()
         val steps = ArrayList<Step>(toPicture())
-        steps += Step("picture mode", 9000) { r -> pressNamed(r, "Picture mode", loose = true) }
-        steps += Step("read modes", 6000) { r ->
+        steps += Step("read sliders", 7000) { r ->
+            val list = sliders(r)
+            if (list.isEmpty()) return@Step false
+            pic.put("sliders", JSONArray().apply { for ((n, b) in list) put(JSONObject().put("name", n).put("v", pct(b))) })
+            true
+        }
+        steps += Step("picture mode", 4000, optional = true) { r -> pressNamed(r, "Picture mode", loose = true) || pressNamed(r, "Picture Mode", loose = true) }
+        steps += Step("read modes", 4000, optional = true) { r ->
             val items = all(r).filter { it.isVisibleToUser && it.isCheckable }
             val names = items.map { itemName(it) }.filter { it.isNotEmpty() }.distinct()
             if (names.size < 2) return@Step false
-            val cur = items.firstOrNull { it.isChecked }?.let { itemName(it) } ?: ""
-            prefs.edit().putString("modes", names.joinToString("\n")).putString("mode", cur).apply()
-            svc.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+            pic.put("modes", JSONArray(names)).put("mode", items.firstOrNull { it.isChecked }?.let { itemName(it) } ?: "")
             true
         }
-        steps += Step("backlight", 6000) { r -> pressNamed(r, "Backlight", loose = true) }
-        steps += Step("read backlight", 5000) { r ->
-            val bar = all(r).firstOrNull { it.rangeInfo != null } ?: return@Step false
-            val ri = bar.rangeInfo
-            val pct = if (ri.max > ri.min) ((ri.current - ri.min) * 100f / (ri.max - ri.min)).toInt() else 50
-            prefs.edit().putInt("backlight", pct).apply(); true
+        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) {
+            if (pic.has("sliders")) prefs.edit().putString("picture", pic.toString()).apply()
+            publish()
         }
-        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) { publish() }
     }
 
     fun pictureMode(mode: String) {
         if (mode.isBlank()) return
         val steps = ArrayList<Step>(toPicture())
-        steps += Step("picture mode", 9000) { r -> pressNamed(r, "Picture mode", loose = true) }
-        steps += Step("pick $mode", 6000) { r -> pressNamed(r, mode).also { if (it) prefs.edit().putString("mode", mode).apply() } }
+        steps += Step("picture mode", 7000) { r -> pressNamed(r, "Picture mode", loose = true) }
+        steps += Step("pick $mode", 6000) { r -> pressNamed(r, mode) }
         steps += MenuDriver.pause(800)
-        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) { publish() }
+        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) { ok -> if (ok) remember { it.put("mode", mode) }; publish() }
     }
 
-    fun backlight(v: Int) {
+    /** Moves one of the picture sliders (by its name, e.g. "Backlight") to [v] percent. */
+    fun pictureSet(name: String, v: Int) {
+        if (name.isBlank()) return
         val steps = ArrayList<Step>(toPicture())
-        steps += Step("backlight", 9000) { r -> pressNamed(r, "Backlight", loose = true) }
-        steps += Step("set backlight", 5000) { r ->
-            val bar = all(r).firstOrNull { it.rangeInfo != null } ?: return@Step false
+        steps += Step("set $name", 7000) { r ->
+            val bar = sliders(r).firstOrNull { it.first.equals(name, true) }?.second ?: return@Step false
             val ri = bar.rangeInfo
             val value = ri.min + (ri.max - ri.min) * v.coerceIn(0, 100) / 100f
-            val args = Bundle().apply { putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, value) }
-            bar.performAction(android.R.id.accessibilityActionSetProgress, args).also { if (it) prefs.edit().putInt("backlight", v).apply() }
+            bar.performAction(android.R.id.accessibilityActionSetProgress, Bundle().apply { putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, value) })
         }
         steps += MenuDriver.pause(600)
-        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) { publish() }
+        driver.run(Intent(Settings.ACTION_DISPLAY_SETTINGS), steps) { ok ->
+            if (ok) remember { p -> p.optJSONArray("sliders")?.let { a -> for (k in 0 until a.length()) a.optJSONObject(k)?.let { if (it.optString("name").equals(name, true)) it.put("v", v) } } }
+            publish()
+        }
+    }
+
+    private fun remember(change: (JSONObject) -> Unit) {
+        val p = pictureJson() ?: return
+        change(p); prefs.edit().putString("picture", p.toString()).apply()
     }
 
     /** The name of a list item: its own text, or the first text inside it. */

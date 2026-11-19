@@ -282,7 +282,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             "bt_power" -> tvset.btPower(o.optBoolean("on"))
             "bt_connect" -> tvset.btConnect(o.optString("addr"))
             "picture_mode" -> tvset.pictureMode(o.optString("mode"))
-            "backlight" -> tvset.backlight(o.optInt("v"))
+            "picture_set" -> tvset.pictureSet(o.optString("name"), o.optInt("v"))
             "store_search" -> store.search(o.optString("q"))
             "install" -> store.install(o.optString("id"))
             "state_get" -> publishState()
