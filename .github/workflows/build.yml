@@ -45,9 +45,9 @@ jobs:
           TV=$((100 + $(git rev-list --count HEAD -- tv)))
           PHONE=$((100 + $(git rev-list --count HEAD -- phone)))
           echo "TV=$TV" >> $GITHUB_ENV; echo "PHONE=$PHONE" >> $GITHUB_ENV
-          set -o pipefail
-          (cd tv && chmod +x gradlew && VERSION_CODE=$TV KEYSTORE="$RUNNER_TEMP/release.p12" ./gradlew --no-daemon -q assembleRelease) 2>&1 | tee out/build.log
-          (cd phone && chmod +x gradlew && VERSION_CODE=$PHONE KEYSTORE="$RUNNER_TEMP/release.p12" ./gradlew --no-daemon -q assembleRelease) 2>&1 | tee -a out/build.log
+          # Downloads from the internet sometimes fail for a moment: each app gets three tries.
+          build() { for n in 1 2 3; do (cd $1 && chmod +x gradlew && VERSION_CODE=$2 KEYSTORE="$RUNNER_TEMP/release.p12" ./gradlew --no-daemon -q assembleRelease) >> out/build.log 2>&1 && return 0; echo "try $n failed" >> out/build.log; sleep 20; done; return 1; }
+          build tv $TV && build phone $PHONE
 
       - name: Lock and publish
         env:
