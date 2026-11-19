@@ -145,6 +145,8 @@ class RemoteLink(private val svc: HomeKeyService) {
         val s = seal ?: return
         val o = JSONObject()
         o.put("t", System.currentTimeMillis())
+        // Which build the TV runs, and how its last update went (read from GitHub when checking problems).
+        o.put("v", Updater.versionOf(svc)).put("upd", Updater.last)
         app?.let { a ->
             o.put("app", JSONObject().put("pkg", a).put("label", label(a)))
             val c = controller

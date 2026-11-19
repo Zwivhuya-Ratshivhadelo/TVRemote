@@ -44,17 +44,19 @@ class Updater(private val ctx: Context, private val which: String) {
         busy = true
         worker.execute {
             try {
-                val n = latest() ?: return@execute
-                if (n <= installed()) return@execute
+                val n = latest() ?: run { last = "no answer from GitHub"; return@execute }
+                if (n <= installed()) { last = "up to date ($n)"; return@execute }
+                last = "downloading $n"
                 val key = ctx.getString(R.string.link_key).trim()
-                val apk = Seal(key).open(get("$which.bin")) ?: run { Log.w(TAG, "update didn't unlock"); return@execute }
+                val apk = Seal(key).open(get("$which.bin")) ?: run { last = "didn't unlock"; return@execute }
                 val f = File(ctx.cacheDir, "update-$which.apk"); f.writeBytes(apk)
                 // Only this app, and only newer than what is installed.
                 val info = ctx.packageManager.getPackageArchiveInfo(f.path, 0)
                 val code = if (info == null) 0L else if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
-                if (info?.packageName != ctx.packageName || code <= installed()) { f.delete(); return@execute }
+                if (info?.packageName != ctx.packageName || code <= installed()) { f.delete(); last = "not newer"; return@execute }
+                last = "ready $code, waiting for the home screen"
                 ready(f)
-            } catch (e: Exception) { Log.w(TAG, "update failed", e) }
+            } catch (e: Exception) { last = "failed: ${e.message}"; Log.w(TAG, "update failed", e) }
             finally { busy = false }
         }
     }
@@ -77,7 +79,8 @@ class Updater(private val ctx: Context, private val which: String) {
                 }
                 pending = true
                 pendingAt = System.currentTimeMillis()
-            } catch (e: Exception) { Log.w(TAG, "install failed", e) }
+                last = "installing"
+            } catch (e: Exception) { last = "install failed: ${e.message}"; Log.w(TAG, "install failed", e) }
         }
     }
 
@@ -86,11 +89,12 @@ class Updater(private val ctx: Context, private val which: String) {
         override fun onReceive(c: Context, i: Intent) {
             when (i.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)) {
                 PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                    last = "install screen"
                     @Suppress("DEPRECATION") val ask = i.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
                     try { c.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (e: Exception) { Log.w(TAG, "install screen", e) }
                 }
                 PackageInstaller.STATUS_SUCCESS -> pending = false
-                else -> { pending = false; Log.w(TAG, "install: " + i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)) }
+                else -> { pending = false; last = "install: " + i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) }
             }
         }
     }
@@ -119,6 +123,12 @@ class Updater(private val ctx: Context, private val which: String) {
         private const val ACTION = "com.livingroom.home.UPDATE_RESULT"
         /** True while Android's install screen for our own update may be showing. */
         @Volatile var pending = false
+        /** How the last update went, in a few words. */
+        @Volatile var last = ""
+        fun versionOf(c: Context): Long = try {
+            val p = c.packageManager.getPackageInfo(c.packageName, 0)
+            if (Build.VERSION.SDK_INT >= 28) p.longVersionCode else @Suppress("DEPRECATION") p.versionCode.toLong()
+        } catch (e: Exception) { 0L }
         @Volatile var pendingAt = 0L
     }
 }
