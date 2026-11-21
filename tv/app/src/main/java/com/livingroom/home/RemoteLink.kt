@@ -117,6 +117,10 @@ class RemoteLink(private val svc: HomeKeyService) {
     private val doneTyping = Runnable { typing = false }
 
     /** Looked at soon after the screen changes (at most every 400 ms, however busy the screen is). */
+    /** The app at the front of the TV's home screen. */
+    private var sel = ""
+    fun onSelected(id: String) { if (id != sel) { sel = id; schedule() } }
+
     fun checkKeyboard() { if (!kbdQueued) { kbdQueued = true; main.postDelayed(kbdCheck, 400) } }
     @Volatile private var kbdSeen = ""
 
@@ -179,6 +183,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         o.put("v", Updater.versionOf(svc)).put("upd", Updater.last).put("dpad", HomeKeyService.lastDpad)
         if (kbd) o.put("kbd", JSONObject().put("on", true).put("text", kbdText))
         o.put("kbdSeen", kbdSeen)
+        if (sel.isNotEmpty()) o.put("sel", sel)
         app?.let { a ->
             o.put("app", JSONObject().put("pkg", a).put("label", label(a)))
             val c = controller
@@ -306,6 +311,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             "type" -> type(o.optString("text"))
             "type_live" -> typeLive(o.optString("text"))
             "type_enter" -> typeEnter()
+            "select" -> if (HomeActivity.showing) svc.sendBroadcast(Intent(SELECT).setPackage(svc.packageName).putExtra("id", o.optString("id")))
             "home_add" -> { HomeList.add(svc, o.optString("id")); changed() }
             "home_remove" -> { HomeList.remove(svc, o.optString("id")); changed() }
             "settings" -> settings(o.optString("which"))
@@ -441,6 +447,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         const val GOOGLE_HOME = "com.google.android.apps.tv.launcherx"
         const val HOME_LIST_CHANGED = "com.livingroom.home.HOME_LIST_CHANGED"
         const val DPAD = "com.livingroom.home.DPAD"
+        const val SELECT = "com.livingroom.home.SELECT"
         private val IGNORE = setOf("com.android.systemui", "com.google.android.tvrecommendations", "com.google.android.katniss",
             "com.android.inputmethod.latin", "com.google.android.inputmethod.latin", "com.google.android.leanback.ime",
             "org.liskovsoft.androidtv.rukeyboard", "com.google.android.tungsten.setupwraith")

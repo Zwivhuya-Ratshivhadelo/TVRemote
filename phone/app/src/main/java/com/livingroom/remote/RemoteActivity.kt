@@ -273,8 +273,10 @@ class RemoteActivity : Activity(), SensorEventListener {
     }
 
     /** Brings an app to the front (it floats forward, the one before drifts back) and, when tapped, opens it on the TV. */
-    private fun choose(b: B, open: Boolean = true) {
+    private fun choose(b: B, open: Boolean = true, fromTv: Boolean = false) {
         if (open) Hub.send("open", "id" to b.app.id)
+        // The TV's home screen carousel moves to the same app (unless it was the TV that moved).
+        else if (!fromTv && b.app.id != starId) Hub.send("select", "id" to b.app.id)
         if (b.app.id == starId) { b.view.animate().scaleX(b.view.scaleX * 0.92f).scaleY(b.view.scaleY * 0.92f).setDuration(80).withEndAction { applyBubbles() }.start(); return }
         val old = bubbles.firstOrNull { it.app.id == starId }
         starId = b.app.id
@@ -346,6 +348,9 @@ class RemoteActivity : Activity(), SensorEventListener {
 
         if (st?.app != lastApp) { lastApp = st?.app; forceApps = false }
         keyboardFollowsTv(st?.kbd == true, st?.kbdText ?: "")
+        // Moved on the TV's home screen: the phone's carousel follows.
+        if (st != null && st.app == null && st.sel.isNotEmpty() && st.sel != starId && !padOn)
+            bubbles.firstOrNull { it.app.id == st.sel }?.let { choose(it, open = false, fromTv = true) }
         val play = st?.app != null && !forceApps
         showLayer(if (padOn) "pad" else if (play) "play" else "apps")
         showingPlay = play

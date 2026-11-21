@@ -81,6 +81,8 @@ class HomeKeyService : AccessibilityService() {
 
     /** Our home screen came up: nothing is open on the TV any more. */
     fun homeShowing() { link?.onWindow(packageName) }
+    /** The app at the front of the home screen's carousel. */
+    fun homeSelected(id: String) { link?.onSelected(id) }
 
     fun openHome(force: Boolean = false): Boolean {
         val now = SystemClock.elapsedRealtime()

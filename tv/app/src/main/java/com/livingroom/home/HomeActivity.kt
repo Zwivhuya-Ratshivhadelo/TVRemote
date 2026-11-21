@@ -123,7 +123,7 @@ class HomeActivity : Activity() {
         setContentView(R.layout.activity_home)
         bind()
         try {
-            val f = IntentFilter(RemoteLink.HOME_LIST_CHANGED).apply { addAction(RemoteLink.DPAD) }
+            val f = IntentFilter(RemoteLink.HOME_LIST_CHANGED).apply { addAction(RemoteLink.DPAD); addAction(RemoteLink.SELECT) }
             if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(homeListChanged, f, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(homeListChanged, f)
         } catch (e: Exception) { }
         fitStageToScreen()
@@ -142,6 +142,7 @@ class HomeActivity : Activity() {
         super.onResume()
         showing = true
         HomeKeyService.instance?.homeShowing()
+        entries.getOrNull(sel)?.let { HomeKeyService.instance?.homeSelected(HomeList.idOf(it)) }
         main.removeCallbacks(ticker)
         ticker.run()
         refreshApps()
@@ -283,7 +284,12 @@ class HomeActivity : Activity() {
     private val iconColors = HashMap<String, Int>()
     private val homeListChanged = object : android.content.BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (i.action == RemoteLink.DPAD) {
+            if (i.action == RemoteLink.SELECT) {
+                // The phone moved its carousel: this one moves to the same app.
+                val id = i.getStringExtra("id") ?: return
+                val at = entries.indexOfFirst { HomeList.idOf(it) == id }
+                if (at >= 0) moveTo(at)
+            } else if (i.action == RemoteLink.DPAD) {
                 // The phone's arrows and OK, on our own home screen: the same as the TV remote's.
                 val code = i.getIntExtra("code", 0)
                 HomeKeyService.lastDpad = "home got $code focus=${hasWindowFocus()}"
@@ -362,6 +368,8 @@ class HomeActivity : Activity() {
         if (next == sel || next !in entries.indices || spotOf.size != entries.size) return
         val prev = sel
         sel = next
+        // The phone's carousel follows.
+        HomeKeyService.instance?.homeSelected(HomeList.idOf(entries[next]))
         // Every app at the back moves to a new spot, so the whole cloud of apps shifts around the one coming forward.
         val back = entries.indices.filter { it != next }
         var spots = back.indices.shuffled()

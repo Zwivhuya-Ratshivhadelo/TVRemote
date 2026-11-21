@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
 data class TvApp(val id: String, val label: String, val on: Boolean, val icon: Bitmap?, val color: Int, val sys: Boolean = false)
 data class Media(val title: String, val artist: String, val dur: Long, val pos: Long, val playing: Boolean, val art: String, val at: Long)
 data class TvState(val app: String?, val appLabel: String, val media: Media?, val vol: Int, val volMax: Int, val muted: Boolean,
-                   val temp: Int?, val wx: String?, val kbd: Boolean = false, val kbdText: String = "")
+                   val temp: Int?, val wx: String?, val kbd: Boolean = false, val kbdText: String = "", val sel: String = "")
 
 /** The one link to the TV, shared by every screen. Keeps the last news from the TV so screens open instantly. */
 object Hub {
@@ -126,7 +126,7 @@ object Hub {
                 it.optString("art"), o.optLong("t", System.currentTimeMillis())) },
             v?.optInt("l") ?: 0, v?.optInt("m") ?: 15, v?.optBoolean("mu") ?: false,
             w?.optInt("t"), w?.optString("label"),
-            o.optJSONObject("kbd")?.optBoolean("on") == true, o.optJSONObject("kbd")?.optString("text") ?: "")
+            o.optJSONObject("kbd")?.optBoolean("on") == true, o.optJSONObject("kbd")?.optString("text") ?: "", o.optString("sel"))
     } catch (e: Exception) { null }
 
     private fun parseApps(text: String): List<TvApp>? = try {
