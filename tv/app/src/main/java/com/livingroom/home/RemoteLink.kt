@@ -360,6 +360,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             "type" -> type(o.optString("text"))
             "type_live" -> typeLive(o.optString("text"))
             "type_enter" -> typeEnter()
+            "type_open" -> snapSearchScreen()
             "select" -> if (HomeActivity.showing) svc.sendBroadcast(Intent(SELECT).setPackage(svc.packageName).putExtra("id", o.optString("id")))
             "home_add" -> { HomeList.add(svc, o.optString("id")); changed() }
             "home_remove" -> { HomeList.remove(svc, o.optString("id")); changed() }
@@ -440,6 +441,36 @@ class RemoteLink(private val svc: HomeKeyService) {
         )) {
             try { svc.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (e: Exception) { }
         }
+    }
+
+    /**
+     * One screenshot of an app's search screen (YouTube...), taken the first time you open the phone keyboard there,
+     * so the TV's own search bar can be made to match it exactly. Sent locked with the TV key; once per app.
+     */
+    private fun snapSearchScreen() {
+        val pkg = app ?: return
+        if (android.os.Build.VERSION.SDK_INT < 30) return
+        val prefs = svc.getSharedPreferences("snaps", Context.MODE_PRIVATE)
+        if (prefs.getBoolean(pkg, false)) return
+        main.postDelayed({
+            try {
+                svc.takeScreenshot(android.view.Display.DEFAULT_DISPLAY, svc.mainExecutor, object : android.accessibilityservice.AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(shot: android.accessibilityservice.AccessibilityService.ScreenshotResult) {
+                        worker.execute {
+                            try {
+                                val hw = android.graphics.Bitmap.wrapHardwareBuffer(shot.hardwareBuffer, shot.colorSpace) ?: return@execute
+                                val bmp = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false); shot.hardwareBuffer.close()
+                                val out = java.io.ByteArrayOutputStream(); bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                val s = seal ?: return@execute
+                                mqtt?.publish(t("snap"), s.seal((pkg + "\u0000").toByteArray() + out.toByteArray()), retain = true)
+                                prefs.edit().putBoolean(pkg, true).apply()
+                            } catch (e: Exception) { Log.w(TAG, "snap", e) }
+                        }
+                    }
+                    override fun onFailure(code: Int) { Log.w(TAG, "snap failed $code") }
+                })
+            } catch (e: Exception) { Log.w(TAG, "snap", e) }
+        }, 1200)
     }
 
     /** Searches inside the app that's open (YouTube, Netflix, ...); the TV's own search when nothing is open. */

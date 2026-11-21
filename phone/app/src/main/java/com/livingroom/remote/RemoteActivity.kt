@@ -121,7 +121,7 @@ class RemoteActivity : Activity(), SensorEventListener {
         // Your phone's keyboard, top right: types into the TV's box, or searches inside the app that's open.
         root.place(s, ImageView(this).apply { setImageResource(R.drawable.ic_keyboard); setPadding(s.px(10), s.px(10), s.px(10), s.px(10))
             setOnClickListener { tap(it)
-                if (!keysUp) { settingKeys = true; tvKeys.setText(""); settingKeys = false; tvKeys.alpha = 1f }
+                if (!keysUp) { settingKeys = true; tvKeys.setText(""); settingKeys = false; tvKeys.alpha = 1f; Hub.send("type_open") }
                 tvKeys.requestFocus(); (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(tvKeys, InputMethodManager.SHOW_IMPLICIT) } },
             355f, 40f, 44f, 44f)
 

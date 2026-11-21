@@ -14,7 +14,7 @@ jobs:
           LINK_KEY: ${{ secrets.LINK_KEY }}
         run: |
           python3 -m pip install --quiet paho-mqtt cryptography
-          mkdir -p out; python3 tools/probe.py > out/probe.json 2>&1 || true
+          mkdir -p out; python3 tools/probe.py > out/probe.json 2>&1 || true; [ -f snap.jpg ] && mv snap.jpg out/ || true
           cd out; git init -q -b probe-out
           git config user.name "Living Room builds"; git config user.email "builds@users.noreply.github.com"
           git add -A; git commit -qm "probe"

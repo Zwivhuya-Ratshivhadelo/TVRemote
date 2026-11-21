@@ -31,4 +31,9 @@ if "apps" in got:
     p = opened(got["apps"])
     if p:
         a = json.loads(p); out["apps"] = [(x.get("label"), x.get("on")) for x in a]
+if "snap" in got:
+    p = opened(got["snap"])
+    if p:
+        z = p.index(b"\0"); out["snap"] = p[:z].decode()
+        open("snap.jpg", "wb").write(p[z + 1:])
 print(json.dumps(out, indent=1)[:20000])
