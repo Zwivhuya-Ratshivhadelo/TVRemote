@@ -58,6 +58,11 @@ class RemoteActivity : Activity(), SensorEventListener {
     private var keysUp = false
     private var settingKeys = false
     private val sendKeys = Runnable { Hub.send("type_live", "text" to tvKeys.text.toString()) }
+    private var lastSearch = ""
+    private val sendSearch = Runnable {
+        val q = tvKeys.text.toString().trim()
+        if (q.length >= 2 && q != lastSearch) { lastSearch = q; Hub.send("app_search", "q" to q) }
+    }
 
     // playing screen
     private lateinit var badgeIcon: Bubble
@@ -156,16 +161,20 @@ class RemoteActivity : Activity(), SensorEventListener {
                 override fun beforeTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun afterTextChanged(e: android.text.Editable?) {
-                    if (settingKeys || !keysUp) return   // no text box on the TV: it's sent as a search on Enter
-                    removeCallbacks(sendKeys); postDelayed(sendKeys, 150)
+                    if (settingKeys) return
+                    if (keysUp) { removeCallbacks(sendKeys); postDelayed(sendKeys, 150) }
+                    // No text box on the TV (YouTube, Netflix): search inside the app a moment after you stop typing.
+                    else { removeCallbacks(sendSearch); postDelayed(sendSearch, 900) }
                 }
             })
             setOnEditorActionListener { _, _, _ ->
                 if (keysUp) { removeCallbacks(sendKeys); sendKeys.run(); Hub.send("type_enter") }
                 else {
                     // Typed with the keyboard button: a search inside the app that's open (YouTube, Netflix, ...).
+                    removeCallbacks(sendSearch)
                     val q = text.toString().trim()
-                    if (q.isNotEmpty()) Hub.send("app_search", "q" to q)
+                    if (q.isNotEmpty() && q != lastSearch) Hub.send("app_search", "q" to q)
+                    lastSearch = ""
                     settingKeys = true; setText(""); settingKeys = false
                     (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0); clearFocus()
                 }
