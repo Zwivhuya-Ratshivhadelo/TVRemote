@@ -105,6 +105,8 @@ class HomeKeyService : AccessibilityService() {
         event ?: return
         val pk = event.packageName?.toString() ?: ""
         if (pk == PlayStore.VENDING) link?.onStoreScreen()
+        // A text box on the TV got focus (or lost it): the phone's keyboard follows.
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED || event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) link?.checkKeyboard()
         if (pk in INSTALLERS && Updater.pending && System.currentTimeMillis() - Updater.pendingAt < 3 * 60_000) pressInstall()
         if (pk != packageName && System.currentTimeMillis() - TvSettings.pairingAt < 30_000) {
             rootInActiveWindow?.let { r -> MenuDriver.press(MenuDriver.find(r, "Pair") ?: MenuDriver.find(r, "OK")) }

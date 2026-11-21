@@ -96,6 +96,21 @@ class RemoteLink(private val svc: HomeKeyService) {
 
     // ------------------------------------------------------------------------------- what is on the TV
 
+    /** Whether a text box on the TV has focus (its keyboard is up), and what is in it. */
+    private var kbd = false
+    private var kbdText = ""
+    private val kbdCheck = Runnable {
+        val box = try { svc.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && it.isVisibleToUser } } catch (e: Exception) { null }
+        val on = box != null
+        val text = if (box != null && !(android.os.Build.VERSION.SDK_INT >= 26 && box.isShowingHintText)) box.text?.toString() ?: "" else ""
+        if (on != kbd || (on && text != kbdText && !typing)) { kbd = on; kbdText = text; schedule() }
+    }
+    /** True for a moment after the phone typed, so the TV's echo doesn't overwrite what you're typing. */
+    @Volatile private var typing = false
+    private val doneTyping = Runnable { typing = false }
+
+    fun checkKeyboard() { main.removeCallbacks(kbdCheck); main.postDelayed(kbdCheck, 250) }
+
     /** Called by the HOME helper whenever a different screen comes to the front. */
     fun onWindow(pkg: String) {
         val now = when {
@@ -147,6 +162,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         o.put("t", System.currentTimeMillis())
         // Which build the TV runs, and how its last update went (read from GitHub when checking problems).
         o.put("v", Updater.versionOf(svc)).put("upd", Updater.last).put("dpad", HomeKeyService.lastDpad)
+        if (kbd) o.put("kbd", JSONObject().put("on", true).put("text", kbdText))
         app?.let { a ->
             o.put("app", JSONObject().put("pkg", a).put("label", label(a)))
             val c = controller
@@ -272,6 +288,8 @@ class RemoteLink(private val svc: HomeKeyService) {
             "open" -> open(o.optString("id"))
             "search" -> search(o.optString("q"))
             "type" -> type(o.optString("text"))
+            "type_live" -> typeLive(o.optString("text"))
+            "type_enter" -> typeEnter()
             "home_add" -> { HomeList.add(svc, o.optString("id")); changed() }
             "home_remove" -> { HomeList.remove(svc, o.optString("id")); changed() }
             "settings" -> settings(o.optString("which"))
@@ -360,6 +378,23 @@ class RemoteLink(private val svc: HomeKeyService) {
         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
         if (android.os.Build.VERSION.SDK_INT >= 30) box.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+    }
+
+    /** What you type on the phone's keyboard, into the focused box on the TV as you type (no Enter). */
+    private fun typeLive(text: String) {
+        val root = svc.rootInActiveWindow ?: return
+        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root) ?: return
+        typing = true; main.removeCallbacks(doneTyping); main.postDelayed(doneTyping, 1500)
+        kbdText = text
+        box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) })
+    }
+
+    /** Enter on the phone's keyboard: Enter in the TV's box (search, go, next). */
+    private fun typeEnter() {
+        val root = svc.rootInActiveWindow ?: return
+        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root) ?: return
+        if (android.os.Build.VERSION.SDK_INT >= 30) box.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        checkKeyboard()
     }
 
     private fun findEditable(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {

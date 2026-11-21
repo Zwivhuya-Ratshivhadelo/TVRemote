@@ -22,7 +22,10 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
 import android.widget.LinearLayout
 import java.text.SimpleDateFormat
@@ -49,6 +52,12 @@ class RemoteActivity : Activity(), SensorEventListener {
     private lateinit var pad: ImageView
     private lateinit var padView: FrameLayout
     private var padOn = false
+    private lateinit var tvKeys: EditText
+    private lateinit var micBtn: View
+    private var rec: android.speech.SpeechRecognizer? = null
+    private var keysUp = false
+    private var settingKeys = false
+    private val sendKeys = Runnable { Hub.send("type_live", "text" to tvKeys.text.toString()) }
 
     // playing screen
     private lateinit var badgeIcon: Bubble
@@ -75,6 +84,8 @@ class RemoteActivity : Activity(), SensorEventListener {
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        // The phone's keyboard opens over the remote without squeezing it.
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         s = Scale(this)
         root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         setContentView(root)
@@ -116,11 +127,33 @@ class RemoteActivity : Activity(), SensorEventListener {
         root.place(s, pad, 36f, 40f, 42f, 42f)
 
         // Bottom: mic, keyboard, home (big, in the middle), mute, power.
-        root.place(s, roundButton(s, R.drawable.ic_mic, 54f, iconSize = 22f) { startActivity(Intent(this, VoiceActivity::class.java)) }, 48f, 750f, 54f, 54f)
-        root.place(s, roundButton(s, R.drawable.ic_keyboard, 54f, iconSize = 22f) { startActivity(Intent(this, TypeActivity::class.java)) }, 116f, 750f, 54f, 54f)
+        micBtn = roundButton(s, R.drawable.ic_mic, 54f, iconSize = 22f) { listen() }
+        root.place(s, micBtn, 48f, 750f, 54f, 54f)
+        root.place(s, roundButton(s, R.drawable.ic_keyboard, 54f, iconSize = 22f) {
+            // The phone's keyboard, typing straight into the box on the TV.
+            tvKeys.requestFocus(); (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(tvKeys, InputMethodManager.SHOW_IMPLICIT)
+        }, 116f, 750f, 54f, 54f)
         root.place(s, roundButton(s, R.drawable.ic_home, 88f, white = true, iconSize = 30f) { padOn = false; Hub.send("key", "k" to "home"); refresh() }, 195f, 750f, 88f, 88f)
         root.place(s, roundButton(s, R.drawable.ic_mute, 54f, iconSize = 22f) { Hub.send("key", "k" to "mute") }, 274f, 750f, 54f, 54f)
         root.place(s, roundButton(s, R.drawable.ic_power, 54f, iconSize = 22f, red = true) { Hub.send("key", "k" to "power") }, 342f, 750f, 54f, 54f)
+
+        // The phone's own keyboard for the TV: it pops up by itself when a keyboard comes up on the TV,
+        // and what you type goes into the TV's box as you type. Enter presses Enter on the TV.
+        tvKeys = EditText(this).apply {
+            alpha = 0f; isSingleLine = true; background = null; setTextColor(Color.TRANSPARENT)
+            imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(e: android.text.Editable?) {
+                    if (settingKeys) return
+                    removeCallbacks(sendKeys); postDelayed(sendKeys, 150)
+                }
+            })
+            setOnEditorActionListener { _, _, _ -> removeCallbacks(sendKeys); sendKeys.run(); Hub.send("type_enter"); true }
+        }
+        root.addView(tvKeys, FrameLayout.LayoutParams(1, 1))
 
         volBar = VolumeBar(this).apply { alpha = 0f }
         root.place(s, volBar, 368f, 400f, 44f, 200f)
@@ -317,6 +350,7 @@ class RemoteActivity : Activity(), SensorEventListener {
         buildBubbles()
 
         if (st?.app != lastApp) { lastApp = st?.app; forceApps = false }
+        keyboardFollowsTv(st?.kbd == true, st?.kbdText ?: "")
         val play = st?.app != null && !forceApps
         showLayer(if (padOn) "pad" else if (play) "play" else "apps")
         showingPlay = play
@@ -353,6 +387,57 @@ class RemoteActivity : Activity(), SensorEventListener {
         val p = pos.coerceIn(0, m.dur)
         progress.frac = p.toFloat() / m.dur
         tStart.text = fmt(p); tEnd.text = fmt(m.dur)
+    }
+
+    /**
+     * The mic, right here: the button pulses while you speak. What you said goes into the TV's text box if one is
+     * open, otherwise it's a Google search on the TV.
+     */
+    private fun listen() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 7); return
+        }
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(this)) return
+        rec?.destroy()
+        rec = android.speech.SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : android.speech.RecognitionListener {
+                override fun onReadyForSpeech(p: Bundle?) { micBtn.animate().scaleX(1.12f).scaleY(1.12f).setDuration(150).start() }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rms: Float) { val k = 1.1f + (rms.coerceIn(0f, 10f) / 10f) * 0.25f; micBtn.scaleX = k; micBtn.scaleY = k }
+                override fun onBufferReceived(b: ByteArray?) {}
+                override fun onEndOfSpeech() { micBtn.animate().scaleX(1f).scaleY(1f).setDuration(200).start() }
+                override fun onError(e: Int) { micBtn.animate().scaleX(1f).scaleY(1f).setDuration(200).start() }
+                override fun onPartialResults(b: Bundle?) {}
+                override fun onEvent(t: Int, b: Bundle?) {}
+                override fun onResults(b: Bundle?) {
+                    micBtn.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+                    val q = b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
+                    if (keysUp) { Hub.send("type_live", "text" to q); Hub.send("type_enter") } else Hub.send("search", "q" to q)
+                }
+            })
+            startListening(Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, false))
+        }
+    }
+
+    override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) {
+        super.onRequestPermissionsResult(code, p, r)
+        if (code == 7 && r.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) listen()
+    }
+
+    /** Up when the TV's keyboard is up; down when it goes away. */
+    private fun keyboardFollowsTv(up: Boolean, text: String) {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        if (up && !keysUp) {
+            keysUp = true
+            settingKeys = true; tvKeys.setText(text); tvKeys.setSelection(tvKeys.text.length); settingKeys = false
+            tvKeys.requestFocus()
+            tvKeys.post { imm.showSoftInput(tvKeys, InputMethodManager.SHOW_IMPLICIT) }
+        } else if (!up && keysUp) {
+            keysUp = false
+            imm.hideSoftInputFromWindow(tvKeys.windowToken, 0); tvKeys.clearFocus()
+        }
     }
 
     private var layer = "apps"
@@ -451,6 +536,7 @@ class RemoteActivity : Activity(), SensorEventListener {
     }
 
     override fun onStop() {
+        rec?.destroy(); rec = null
         sensors?.unregisterListener(this)
         Choreographer.getInstance().removeFrameCallback(frame)
         main.removeCallbacks(tick)
