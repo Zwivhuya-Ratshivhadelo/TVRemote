@@ -99,8 +99,15 @@ class RemoteLink(private val svc: HomeKeyService) {
     /** Whether a text box on the TV has focus (its keyboard is up), and what is in it. */
     private var kbd = false
     private var kbdText = ""
+    private var kbdQueued = false
     private val kbdCheck = Runnable {
-        val box = try { svc.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && it.isVisibleToUser } } catch (e: Exception) { null }
+        kbdQueued = false
+        // A focused text box, or (YouTube, Netflix: they draw their own keyboard) a text box on screen.
+        val root = try { svc.rootInActiveWindow } catch (e: Exception) { null }
+        val box = try { root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && it.isVisibleToUser }
+            ?: root?.let { visibleEditable(it) } } catch (e: Exception) { null }
+        val seen = "${root?.packageName}:${box != null}"
+        if (seen != kbdSeen) { kbdSeen = seen; schedule() }
         val on = box != null
         val text = if (box != null && !(android.os.Build.VERSION.SDK_INT >= 26 && box.isShowingHintText)) box.text?.toString() ?: "" else ""
         if (on != kbd || (on && text != kbdText && !typing)) { kbd = on; kbdText = text; schedule() }
@@ -109,7 +116,15 @@ class RemoteLink(private val svc: HomeKeyService) {
     @Volatile private var typing = false
     private val doneTyping = Runnable { typing = false }
 
-    fun checkKeyboard() { main.removeCallbacks(kbdCheck); main.postDelayed(kbdCheck, 250) }
+    /** Looked at soon after the screen changes (at most every 400 ms, however busy the screen is). */
+    fun checkKeyboard() { if (!kbdQueued) { kbdQueued = true; main.postDelayed(kbdCheck, 400) } }
+    @Volatile private var kbdSeen = ""
+
+    private fun visibleEditable(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (n.isEditable && n.isVisibleToUser) return n
+        for (i in 0 until n.childCount) n.getChild(i)?.let { visibleEditable(it)?.let { f -> return f } }
+        return null
+    }
 
     /** Called by the HOME helper whenever a different screen comes to the front. */
     fun onWindow(pkg: String) {
@@ -163,6 +178,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         // Which build the TV runs, and how its last update went (read from GitHub when checking problems).
         o.put("v", Updater.versionOf(svc)).put("upd", Updater.last).put("dpad", HomeKeyService.lastDpad)
         if (kbd) o.put("kbd", JSONObject().put("on", true).put("text", kbdText))
+        o.put("kbdSeen", kbdSeen)
         app?.let { a ->
             o.put("app", JSONObject().put("pkg", a).put("label", label(a)))
             val c = controller
