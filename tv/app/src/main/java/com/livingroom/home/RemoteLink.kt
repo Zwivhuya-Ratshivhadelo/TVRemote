@@ -106,10 +106,15 @@ class RemoteLink(private val svc: HomeKeyService) {
         val root = try { svc.rootInActiveWindow } catch (e: Exception) { null }
         val box = try { root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable && it.isVisibleToUser }
             ?: root?.let { visibleEditable(it) } } catch (e: Exception) { null }
-        val seen = "${root?.packageName}:${box != null}"
+        // YouTube, Netflix, Prime: no text box, just their own on-screen keyboard of letter keys.
+        val osk = if (box == null && root != null && root.packageName != svc.packageName) keys(root).takeIf { it.size >= 20 } else null
+        if (osk == null) oskText = ""
+        val seen = "${root?.packageName}:${box != null}:${osk != null}"
+        if (seen != kbdSeen) scr = if (box == null && osk == null && root != null && root.packageName != svc.packageName)
+            org.json.JSONArray(allNodes(root).filter { it.isVisibleToUser }.map { (it.text ?: it.contentDescription ?: "").toString().trim() }.filter { it.isNotEmpty() }.distinct().take(50)) else null
         if (seen != kbdSeen) { kbdSeen = seen; schedule() }
-        val on = box != null
-        val text = if (box != null && !(android.os.Build.VERSION.SDK_INT >= 26 && box.isShowingHintText)) box.text?.toString() ?: "" else ""
+        val on = box != null || osk != null
+        val text = if (box != null && !(android.os.Build.VERSION.SDK_INT >= 26 && box.isShowingHintText)) box.text?.toString() ?: "" else oskText
         if (on != kbd || (on && text != kbdText && !typing)) { kbd = on; kbdText = text; schedule() }
     }
     /** True for a moment after the phone typed, so the TV's echo doesn't overwrite what you're typing. */
@@ -123,6 +128,48 @@ class RemoteLink(private val svc: HomeKeyService) {
 
     fun checkKeyboard() { if (!kbdQueued) { kbdQueued = true; main.postDelayed(kbdCheck, 400) } }
     @Volatile private var kbdSeen = ""
+
+    /** What has been typed on an app's own on-screen keyboard from the phone (it can't be read back). */
+    private var oskText = ""
+    /** What was on screen when no keyboard was found (sent along for checking). */
+    @Volatile private var scr: org.json.JSONArray? = null
+
+    private fun allNodes(n: AccessibilityNodeInfo, out: MutableList<AccessibilityNodeInfo> = ArrayList()): MutableList<AccessibilityNodeInfo> {
+        out += n; for (i in 0 until n.childCount) n.getChild(i)?.let { allNodes(it, out) }; return out
+    }
+    private fun nameOf(n: AccessibilityNodeInfo) = (n.text ?: n.contentDescription ?: "").toString().trim()
+
+    /** The letter and number keys of an on-screen keyboard: "a" → its key. */
+    private fun keys(root: AccessibilityNodeInfo): Map<String, AccessibilityNodeInfo> {
+        val m = HashMap<String, AccessibilityNodeInfo>()
+        for (n in allNodes(root)) if (n.isVisibleToUser) { val t = nameOf(n); if (t.length == 1 && t[0].isLetterOrDigit()) m.putIfAbsent(t.lowercase(), n) }
+        return m
+    }
+
+    private fun pressKey(n: AccessibilityNodeInfo?): Boolean {
+        var c = n; while (c != null && !c.isClickable) c = c.parent
+        return c?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+    }
+
+    private fun findKey(root: AccessibilityNodeInfo, vararg names: String): AccessibilityNodeInfo? =
+        allNodes(root).firstOrNull { n -> n.isVisibleToUser && names.any { nameOf(n).equals(it, true) } }
+
+    /** Types on an app's own keyboard by pressing its keys: deletes back to where the text differs, then the rest. */
+    private fun typeOnKeys(root: AccessibilityNodeInfo, text: String): Boolean {
+        val k = keys(root); if (k.size < 20) return false
+        var same = 0
+        while (same < oskText.length && same < text.length && oskText[same].equals(text[same], true)) same++
+        val del = findKey(root, "delete", "backspace", "del", "⌫", "backspace key", "delete key")
+        repeat(oskText.length - same) { pressKey(del) }
+        for (ch in text.substring(same)) {
+            when {
+                ch == ' ' -> pressKey(findKey(root, "space", "space key", "␣"))
+                else -> pressKey(k[ch.lowercaseChar().toString()])
+            }
+        }
+        oskText = text
+        return true
+    }
 
     private fun visibleEditable(n: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         if (n.isEditable && n.isVisibleToUser) return n
@@ -183,6 +230,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         o.put("v", Updater.versionOf(svc)).put("upd", Updater.last).put("dpad", HomeKeyService.lastDpad)
         if (kbd) o.put("kbd", JSONObject().put("on", true).put("text", kbdText))
         o.put("kbdSeen", kbdSeen)
+        scr?.let { o.put("scr", it) }
         if (sel.isNotEmpty()) o.put("sel", sel)
         app?.let { a ->
             o.put("app", JSONObject().put("pkg", a).put("label", label(a)))
@@ -405,7 +453,8 @@ class RemoteLink(private val svc: HomeKeyService) {
     /** What you type on the phone's keyboard, into the focused box on the TV as you type (no Enter). */
     private fun typeLive(text: String) {
         val root = svc.rootInActiveWindow ?: return
-        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root) ?: return
+        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root)
+            ?: run { typeOnKeys(root, text); return }
         typing = true; main.removeCallbacks(doneTyping); main.postDelayed(doneTyping, 1500)
         kbdText = text
         box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) })
@@ -414,7 +463,8 @@ class RemoteLink(private val svc: HomeKeyService) {
     /** Enter on the phone's keyboard: Enter in the TV's box (search, go, next). */
     private fun typeEnter() {
         val root = svc.rootInActiveWindow ?: return
-        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root) ?: return
+        val box = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } ?: findEditable(root)
+            ?: run { pressKey(findKey(root, "search", "done", "enter", "go")); return }
         if (android.os.Build.VERSION.SDK_INT >= 30) box.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
         checkKeyboard()
     }
