@@ -229,7 +229,7 @@ class RemoteLink(private val svc: HomeKeyService) {
         // Which build the TV runs, and how its last update went (read from GitHub when checking problems).
         o.put("v", Updater.versionOf(svc)).put("upd", Updater.last).put("dpad", HomeKeyService.lastDpad)
         if (kbd) o.put("kbd", JSONObject().put("on", true).put("text", kbdText))
-        o.put("kbdSeen", kbdSeen).put("srch", lastSearch)
+        o.put("kbdSeen", kbdSeen)
         scr?.let { o.put("scr", it) }
         if (sel.isNotEmpty()) o.put("sel", sel)
         app?.let { a ->
@@ -442,9 +442,6 @@ class RemoteLink(private val svc: HomeKeyService) {
         }
     }
 
-    /** How the last search went (sent along for checking). */
-    @Volatile private var lastSearch = ""
-
     /** Searches inside the app that's open (YouTube, Netflix, ...); the TV's own search when nothing is open. */
     private fun appSearch(q: String) {
         if (q.isBlank()) return
@@ -458,12 +455,8 @@ class RemoteLink(private val svc: HomeKeyService) {
         tries += Intent(Intent.ACTION_SEARCH).putExtra(SearchManager.QUERY, q)
         tries += Intent("android.search.action.GLOBAL_SEARCH").putExtra(SearchManager.QUERY, q)
         for (i in tries) {
-            try {
-                svc.startActivity(i.setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
-                lastSearch = "$q -> ${i.action} ${i.data ?: ""}"; schedule(); return
-            } catch (ex: Exception) { lastSearch = "$q -> failed ${i.action}: ${ex.javaClass.simpleName}" }
+            try { svc.startActivity(i.setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)); return } catch (ex: Exception) { }
         }
-        lastSearch = "$q -> TV search"; schedule()
         search(q)
     }
 
