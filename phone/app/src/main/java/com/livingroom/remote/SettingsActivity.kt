@@ -67,7 +67,33 @@ class SettingsActivity : Activity() {
                 else startActivity(Intent(this, SettingsActivity::class.java).putExtra("page", p)) }
             root.place(s, row, 195f, 178f + k * 76f, 342f, 76f)
         }
+        // Check for updates: the phone and the TV look for new builds right now.
+        val up = FrameLayout(this)
+        up.addView(ImageView(this).apply { setImageResource(R.drawable.ic_update) },
+            FrameLayout.LayoutParams(s.px(26), s.px(26), Gravity.START or Gravity.CENTER_VERTICAL))
+        up.addView(text(s, 20f).apply { text = "Check for updates"; typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL }, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = s.px(46) })
+        val slot = FrameLayout(this)
+        up.addView(slot, FrameLayout.LayoutParams(s.px(44), s.px(24), Gravity.END or Gravity.CENTER_VERTICAL))
+        up.addView(View(this).apply { setBackgroundColor(Color.argb(20, 255, 255, 255)) }, FrameLayout.LayoutParams(-1, maxOf(1, s.px(1)), Gravity.BOTTOM))
+        up.setOnClickListener { tap(it)
+            if (checking) return@setOnClickListener
+            checking = true
+            slot.removeAllViews(); slot.addView(Loader(this), FrameLayout.LayoutParams(-1, -1))
+            Hub.send("update_now")
+            updater.check { f -> runOnUiThread { updater.install(f) } }
+            slot.postDelayed({
+                checking = false; slot.removeAllViews()
+                val phoneOk = Updater.last.startsWith("up to date")
+                val tvOk = Hub.state?.tvUpd?.startsWith("up to date") == true
+                if (phoneOk && tvOk) slot.addView(tick(), FrameLayout.LayoutParams(s.px(20), s.px(20), Gravity.END or Gravity.CENTER_VERTICAL))
+            }, 9000)
+        }
+        root.place(s, up, 195f, 178f + items.size * 76f, 342f, 76f)
     }
+
+    private var checking = false
+    private val updater by lazy { Updater(applicationContext, "phone").also { it.start() } }
 
     // ------------------------------------------------------------------------------- Picture / Wi-Fi / Bluetooth
 
