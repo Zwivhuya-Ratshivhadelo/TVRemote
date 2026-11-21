@@ -356,6 +356,7 @@ class RemoteLink(private val svc: HomeKeyService) {
             "key" -> key(o.optString("k"))
             "open" -> open(o.optString("id"))
             "search" -> search(o.optString("q"))
+            "app_search" -> appSearch(o.optString("q"))
             "type" -> type(o.optString("text"))
             "type_live" -> typeLive(o.optString("text"))
             "type_enter" -> typeEnter()
@@ -439,6 +440,24 @@ class RemoteLink(private val svc: HomeKeyService) {
         )) {
             try { svc.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return } catch (e: Exception) { }
         }
+    }
+
+    /** Searches inside the app that's open (YouTube, Netflix, ...); the TV's own search when nothing is open. */
+    private fun appSearch(q: String) {
+        if (q.isBlank()) return
+        val pkg = app ?: run { search(q); return }
+        val e = java.net.URLEncoder.encode(q, "UTF-8")
+        val tries = ArrayList<Intent>()
+        when (pkg) {
+            "com.google.android.youtube.tv" -> tries += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/results?search_query=$e"))
+            "com.netflix.ninja" -> tries += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.netflix.com/search?q=$e"))
+        }
+        tries += Intent(Intent.ACTION_SEARCH).putExtra(SearchManager.QUERY, q)
+        tries += Intent("android.search.action.GLOBAL_SEARCH").putExtra(SearchManager.QUERY, q)
+        for (i in tries) {
+            try { svc.startActivity(i.setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)); return } catch (ex: Exception) { }
+        }
+        search(q)
     }
 
     /** Puts typed text into the box that has focus on the TV and submits it. */

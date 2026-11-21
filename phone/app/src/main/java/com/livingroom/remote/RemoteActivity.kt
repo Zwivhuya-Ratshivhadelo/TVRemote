@@ -118,6 +118,13 @@ class RemoteActivity : Activity(), SensorEventListener {
             setOnClickListener { tap(it); forceApps = true; refresh() } }
         root.place(s, grid, 36f, 40f, 44f, 44f)
 
+        // Your phone's keyboard, top right: types into the TV's box, or searches inside the app that's open.
+        root.place(s, ImageView(this).apply { setImageResource(R.drawable.ic_keyboard); setPadding(s.px(10), s.px(10), s.px(10), s.px(10))
+            setOnClickListener { tap(it)
+                if (!keysUp) { settingKeys = true; tvKeys.setText(""); settingKeys = false; tvKeys.alpha = 1f }
+                tvKeys.requestFocus(); (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(tvKeys, InputMethodManager.SHOW_IMPLICIT) } },
+            355f, 40f, 44f, 44f)
+
         // The arrows-and-OK button, top left.
         pad = ImageView(this).apply { setImageResource(R.drawable.ic_dpad); setPadding(s.px(9), s.px(9), s.px(9), s.px(9))
             setOnClickListener { tap(it); padOn = !padOn; refresh() } }
@@ -135,20 +142,35 @@ class RemoteActivity : Activity(), SensorEventListener {
         // The phone's own keyboard for the TV: it pops up by itself when a keyboard comes up on the TV,
         // and what you type goes into the TV's box as you type. Enter presses Enter on the TV.
         tvKeys = EditText(this).apply {
-            alpha = 0f; isSingleLine = true; background = null; setTextColor(Color.TRANSPARENT)
+            // Hidden while typing into a box on the TV (it shows there); shown at the top when searching inside an app.
+            alpha = 0f; isSingleLine = true; setTextColor(Color.WHITE); setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, s.px(18f))
+            background = GradientDrawable().apply { setColor(Color.rgb(0x1a, 0x1b, 0x1f)); cornerRadius = s.px(28f) }
+            setPadding(s.px(22), 0, s.px(22), 0); gravity = android.view.Gravity.CENTER_VERTICAL
+            setOnFocusChangeListener { v, has -> if (!has) v.alpha = 0f }
             imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            // Your normal keyboard: autocorrect and word suggestions on.
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
             addTextChangedListener(object : android.text.TextWatcher {
                 override fun beforeTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(t: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun afterTextChanged(e: android.text.Editable?) {
-                    if (settingKeys) return
+                    if (settingKeys || !keysUp) return   // no text box on the TV: it's sent as a search on Enter
                     removeCallbacks(sendKeys); postDelayed(sendKeys, 150)
                 }
             })
-            setOnEditorActionListener { _, _, _ -> removeCallbacks(sendKeys); sendKeys.run(); Hub.send("type_enter"); true }
+            setOnEditorActionListener { _, _, _ ->
+                if (keysUp) { removeCallbacks(sendKeys); sendKeys.run(); Hub.send("type_enter") }
+                else {
+                    // Typed with the keyboard button: a search inside the app that's open (YouTube, Netflix, ...).
+                    val q = text.toString().trim()
+                    if (q.isNotEmpty()) Hub.send("app_search", "q" to q)
+                    settingKeys = true; setText(""); settingKeys = false
+                    (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0); clearFocus()
+                }
+                true
+            }
         }
-        root.addView(tvKeys, FrameLayout.LayoutParams(1, 1))
+        root.place(s, tvKeys, 195f, 150f, 342f, 56f)
 
         volBar = VolumeBar(this).apply { alpha = 0f }
         root.place(s, volBar, 368f, 400f, 44f, 200f)
@@ -412,7 +434,7 @@ class RemoteActivity : Activity(), SensorEventListener {
                 override fun onResults(b: Bundle?) {
                     micBtn.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
                     val q = b?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
-                    if (keysUp) { Hub.send("type_live", "text" to q); Hub.send("type_enter") } else Hub.send("search", "q" to q)
+                    if (keysUp) { Hub.send("type_live", "text" to q); Hub.send("type_enter") } else Hub.send("app_search", "q" to q)
                 }
             })
             startListening(Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
