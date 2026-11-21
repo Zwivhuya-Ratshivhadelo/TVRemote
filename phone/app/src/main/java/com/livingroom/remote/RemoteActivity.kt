@@ -147,6 +147,8 @@ class RemoteActivity : Activity(), SensorEventListener {
             background = GradientDrawable().apply { setColor(Color.rgb(0x1a, 0x1b, 0x1f)); cornerRadius = s.px(28f) }
             setPadding(s.px(22), 0, s.px(22), 0); gravity = android.view.Gravity.CENTER_VERTICAL
             setOnFocusChangeListener { v, has -> if (!has) v.alpha = 0f }
+            // While hidden, a tap there does nothing (it doesn't pop the keyboard by surprise).
+            setOnTouchListener { v, _ -> v.alpha == 0f }
             imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             // Your normal keyboard: autocorrect and word suggestions on.
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
