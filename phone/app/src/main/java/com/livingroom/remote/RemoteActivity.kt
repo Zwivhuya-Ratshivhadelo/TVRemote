@@ -114,9 +114,6 @@ class RemoteActivity : Activity(), SensorEventListener {
         root.addView(padView, FrameLayout.LayoutParams(-1, -1))
         buildPad()
 
-        gear = ImageView(this).apply { setImageResource(R.drawable.ic_gear); setPadding(s.px(10), s.px(10), s.px(10), s.px(10))
-            setOnClickListener { tap(it); startActivity(Intent(this@RemoteActivity, SettingsActivity::class.java)) } }
-        root.place(s, gear, 355f, 40f, 44f, 44f)
         grid = ImageView(this).apply { setImageResource(R.drawable.ic_grid); setPadding(s.px(10), s.px(10), s.px(10), s.px(10)); visibility = View.GONE
             setOnClickListener { tap(it); forceApps = true; refresh() } }
         root.place(s, grid, 36f, 40f, 44f, 44f)
@@ -126,15 +123,13 @@ class RemoteActivity : Activity(), SensorEventListener {
             setOnClickListener { tap(it); padOn = !padOn; refresh() } }
         root.place(s, pad, 36f, 40f, 42f, 42f)
 
-        // Bottom: mic, keyboard, home (big, in the middle), mute, power.
+        // Bottom: mic, mute, home (big, in the middle), settings, power.
         micBtn = roundButton(s, R.drawable.ic_mic, 54f, iconSize = 22f) { listen() }
         root.place(s, micBtn, 48f, 750f, 54f, 54f)
-        root.place(s, roundButton(s, R.drawable.ic_keyboard, 54f, iconSize = 22f) {
-            // The phone's keyboard, typing straight into the box on the TV.
-            tvKeys.requestFocus(); (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(tvKeys, InputMethodManager.SHOW_IMPLICIT)
-        }, 116f, 750f, 54f, 54f)
+        root.place(s, roundButton(s, R.drawable.ic_mute, 54f, iconSize = 22f) { Hub.send("key", "k" to "mute") }, 116f, 750f, 54f, 54f)
         root.place(s, roundButton(s, R.drawable.ic_home, 88f, white = true, iconSize = 30f) { padOn = false; Hub.send("key", "k" to "home"); refresh() }, 195f, 750f, 88f, 88f)
-        root.place(s, roundButton(s, R.drawable.ic_mute, 54f, iconSize = 22f) { Hub.send("key", "k" to "mute") }, 274f, 750f, 54f, 54f)
+        gear = roundButton(s, R.drawable.ic_gear, 54f, iconSize = 22f) { startActivity(Intent(this, SettingsActivity::class.java)) }
+        root.place(s, gear, 274f, 750f, 54f, 54f)
         root.place(s, roundButton(s, R.drawable.ic_power, 54f, iconSize = 22f, red = true) { Hub.send("key", "k" to "power") }, 342f, 750f, 54f, 54f)
 
         // The phone's own keyboard for the TV: it pops up by itself when a keyboard comes up on the TV,
